@@ -14,7 +14,7 @@ add_executable(Physics_sim
         Shader/Shader.cpp
         src/Loaders.cpp
         src/matrix.cpp
-        src/camera.cpp
+        Camera/camera.cpp
 )
 
 target_link_libraries(Physics_sim PRIVATE

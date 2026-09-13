@@ -1,13 +1,16 @@
 #include <iostream>
+#include <ostream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "../Meshes/Meshes.h"
-#include "../Meshes/Shader.h"
+#include "../Shader/Shader.h"
+#include "../Camera/camera.h"
 #include "VAO_VBO.h"
 #include "Loaders.h"
 #include "matrix.h"
+#include <vector>
 
 
 constexpr int WIDTH = 800;
@@ -18,7 +21,18 @@ Meshes::Cube cube;
 VAO_VBO buffers;
 Loaders loader;
 Matrix matrix(WIDTH, HEIGHT);
+Camera camera;
 
+std::vector<Meshes::Cube> cubes;
+
+static float speed = 0.5f;
+
+static void spawnCube();
+static void reset();
+static void handle_keyboardInput(GLFWwindow* window);
+static void mouse(GLFWwindow* window, double xpos, double ypos) {
+    camera.mouseInput(xpos, ypos);
+}
 int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -30,6 +44,9 @@ int main() {
         std::cerr << "Failed to create GLFW window" << std::endl;
     }
     glfwMakeContextCurrent(window);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse);
+
 
     if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
         std::cerr << "Failed to initialize GLAD" << std::endl;
@@ -47,7 +64,6 @@ int main() {
     shader.loadTexture("tex", 0);
 
 
-    matrix.Translate(glm::vec3(0.0f, 0.0f, -3.0f));
     glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
 
     auto lastFrame = static_cast<float>(glfwGetTime());
@@ -57,11 +73,15 @@ int main() {
         lastFrame = currentFrame;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        handle_keyboardInput(window);
+
         shader.use();
         shader.loadMatrix("model", matrix.model);
         shader.loadMatrix("projection", matrix.projection);
         shader.loadMatrix("view", matrix.view);
-        matrix.Rotate(50.0f * deltaTime,glm::vec3(0.5f, 0.5f, 1.0f));
+        for (const Meshes::Cube& cube1 : cubes) {
+            matrix.Translate(cube1.position);
+        }
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, crateTex);
@@ -70,6 +90,46 @@ int main() {
 
         glfwPollEvents();
         glfwSwapBuffers(window);
+        std::ostream operator<<(const std::ostream & lhs, const glm::vec3 & vec);
     }
     glfwTerminate();
+}
+
+void handle_keyboardInput(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_W)) {
+        camera.moveForward(speed);
+    }
+    else if (glfwGetKey(window, GLFW_KEY_S)) {
+        camera.moveBackward(speed);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A)) {
+        camera.moveLeft(speed);
+    }
+    else if (glfwGetKey(window, GLFW_KEY_D)) {
+        camera.moveRight(speed);
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE)) {
+        camera.moveUp(speed);
+    }
+    else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) {
+        camera.moveDown(speed);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_1)) {
+        spawnCube();
+    }
+    else if (glfwGetKey(window, GLFW_KEY_R)) {
+        reset();
+    }
+}
+
+void spawnCube() {
+    Meshes::Cube cube1;
+    cube1.position = camera.getPosition();
+    cube1.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    cubes.push_back(cube1);
+}
+
+void reset() {
+    cubes.clear();
 }

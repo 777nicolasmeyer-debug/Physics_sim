@@ -11,6 +11,7 @@ namespace Meshes {
     struct Cube {
         std::vector<float> vertices;
         glm::vec3 position;
+        glm::vec3 velocity;
 
         Cube();
     };
