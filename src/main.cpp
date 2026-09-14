@@ -10,6 +10,7 @@
 #include "../Loaders/Loaders.h"
 #include "../Math/matrix.h"
 #include "../Math/gravity.h"
+#include "../Math/collisions.h"
 #include <vector>
 
 
@@ -24,6 +25,8 @@ Loaders loader;
 Matrix matrix(WIDTH, HEIGHT);
 Camera camera;
 Gravity gravity;
+Collisions collisions;
+
 
 std::vector<Meshes::Cube> cubes;
 
@@ -71,6 +74,9 @@ int main() {
     glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
 
     auto lastFrame = static_cast<float>(glfwGetTime());
+    plane.position.y = -20.f;
+    plane.collider.center = plane.position;
+    plane.collider.type = ColliderType::Plane;
     while (!glfwWindowShouldClose(window)) {
         auto currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
@@ -87,16 +93,56 @@ int main() {
         for (Meshes::Cube& cube1 : cubes) {
             gravity.apply(cube1.velocity, deltaTime);
             cube1.position += cube1.velocity * deltaTime;
+            cube1.collider.center = cube1.position;
+            cube1.collider.type = ColliderType::Box;
+
+            glm::mat4 rot(1.0f);
+            rot = glm::rotate(rot, glm::radians(cube1.rotation.x), glm::vec3(1,0,0));
+            rot = glm::rotate(rot, glm::radians(cube1.rotation.y), glm::vec3(0,1,0));
+            rot = glm::rotate( rot, glm::radians(cube1.rotation.z), glm::vec3(0,0,1));
+
+            cube1.collider.right = glm::normalize(glm::vec3(rot[0]));
+            cube1.collider.up = glm::normalize(glm::vec3(rot[1]));
+            cube1.collider.forward = glm::normalize(glm::vec3(rot[2]));
+
+
+            bool isColliding = collisions.BoxBoxCollision(cube1.collider, plane.collider);
+            if ( isColliding && ! cube1.wasColliding) {
+                cube1.velocity.y *= -0.5f;
+                float impactSpeed = std::abs(cube1.velocity.y);
+                cube1.angularVel += glm::vec3(impactSpeed * 5.0f, impactSpeed * 2.0f, impactSpeed * 3.0f);
+            }
+            cube1.rotation += cube1.angularVel * deltaTime;
+            cube1.wasColliding = isColliding;
+            if (cube1.rotation.y <= 2.0f && glm::length(cube1.angularVel) <= 1.0f) {
+                cube1.angularVel = glm::vec3(0.0f);
+            }
+            else {
+                if (glm::length(cube1.angularVel) >= 1.0f) {
+                    cube1.angularVel *= std::pow(0.99, deltaTime * 60.0f);
+                }
+            }
+
+            for (int i = 0; i < cubes.size(); i++) {
+                collisions.BoxBoxCollision(cube1.collider, cubes[i].collider);
+            }
+
+            cube1.position = cube1.collider.center;
+
             auto model = glm::mat4(1.0f);
             model = glm::translate(model, cube1.position);
+            model = glm::rotate(model, glm::radians(cube1.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(cube1.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(cube1.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
             shader.loadMatrix("model", model);
+
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, crateTex);
             glBindVertexArray(buffers.vao);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
+
         //plane
-        plane.position.y = -20.f;
         auto model = glm::mat4(1.0f);
         model = glm::translate(model, plane.position);
         model = glm::scale(model,glm::vec3(10.0f, 1.0f, 10.0f));

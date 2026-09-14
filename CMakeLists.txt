@@ -16,6 +16,8 @@ add_executable(Physics_sim
         Math/matrix.cpp
         Math/gravity.cpp
         Camera/camera.cpp
+        Math/collisions.cpp
+        Math/OBB.h
 )
 
 target_link_libraries(Physics_sim PRIVATE
