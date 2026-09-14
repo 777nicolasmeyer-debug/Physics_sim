@@ -11,8 +11,8 @@ class VAO_VBO {
 public:
     GLuint vbo;
     GLuint vao;
-    void setCubeVAO(Meshes::Cube& cube);
-    void setCubeVBO(Meshes::Cube& cube);
+    void createVAO();
+    void createVBO();
 };
 
 #endif //PHYSICS_SIM_VAO_VBO_H

@@ -18,6 +18,7 @@ constexpr int HEIGHT = 600;
 
 Shader shader;
 Meshes::Cube cube;
+Meshes::Plane plane;
 VAO_VBO buffers;
 Loaders loader;
 Matrix matrix(WIDTH, HEIGHT);
@@ -27,11 +28,11 @@ Gravity gravity;
 std::vector<Meshes::Cube> cubes;
 
 static float speed = 5.0f;
-float deltaTime = 0.0f;
+static float deltaTime = 0.0f;
 
 static void spawnCube();
 static void reset();
-static void handle_keyboardInput(GLFWwindow* window, float deltaTime);
+static void handle_keyboardInput(GLFWwindow* window);
 static void mouse(GLFWwindow* window, double xpos, double ypos) {
     camera.mouseInput(xpos, ypos, deltaTime);
 }
@@ -57,8 +58,8 @@ int main() {
     glViewport(0, 0, WIDTH, HEIGHT);
     glEnable(GL_DEPTH_TEST);
 
-    buffers.setCubeVBO(cube);
-    buffers.setCubeVAO(cube);
+    buffers.createVBO();
+    buffers.createVAO();
 
     unsigned int crateTex = loader.loadImageFromFile("../assets/crate.png");
     shader.createShaders("../Shader/vertex.glsl", "../Shader/fragment.glsl");
@@ -76,11 +77,13 @@ int main() {
         lastFrame = currentFrame;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        handle_keyboardInput(window, deltaTime);
+        handle_keyboardInput(window);
 
         shader.use();
         shader.loadMatrix("projection", matrix.projection);
         shader.loadMatrix("view", camera.getViewMatrix());
+
+        //cube
         for (Meshes::Cube& cube1 : cubes) {
             gravity.apply(cube1.velocity, deltaTime);
             cube1.position += cube1.velocity * deltaTime;
@@ -90,8 +93,17 @@ int main() {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, crateTex);
             glBindVertexArray(buffers.vao);
-            glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(cube.vertices.size() / 5));
+            glDrawArrays(GL_TRIANGLES, 0, 36);
         }
+        //plane
+        plane.position.y = -20.f;
+        auto model = glm::mat4(1.0f);
+        model = glm::translate(model, plane.position);
+        model = glm::scale(model,glm::vec3(10.0f, 1.0f, 10.0f));
+        shader.loadMatrix("model", model);
+        glBindTexture(GL_TEXTURE_2D, crateTex);
+        glBindVertexArray(buffers.vao);
+        glDrawArrays(GL_TRIANGLES, 36, 36);
 
         glfwPollEvents();
         glfwSwapBuffers(window);
@@ -99,7 +111,12 @@ int main() {
     glfwTerminate();
 }
 
-void handle_keyboardInput(GLFWwindow* window, float deltaTime) {
+static bool SpawnCubeWasDown = false;
+void handle_keyboardInput(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
+        glfwSetWindowShouldClose(window, true);
+    }
+
     if (glfwGetKey(window, GLFW_KEY_W)) {
         camera.moveForward(speed, deltaTime);
     }
@@ -120,9 +137,15 @@ void handle_keyboardInput(GLFWwindow* window, float deltaTime) {
     }
 
     if (glfwGetKey(window, GLFW_KEY_1)) {
-        spawnCube();
+        if (!SpawnCubeWasDown) {
+            spawnCube();
+            SpawnCubeWasDown = true;
+        }
     }
-    else if (glfwGetKey(window, GLFW_KEY_R)) {
+    else {
+        SpawnCubeWasDown = false;
+    }
+    if (glfwGetKey(window, GLFW_KEY_R)) {
         reset();
     }
 }
