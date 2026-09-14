@@ -14,16 +14,17 @@ class Camera {
 public:
     Camera();
     glm::mat4 view();
-    void moveForward(float speed);
-    void moveBackward(float speed);
-    void moveLeft(float speed);
-    void moveRight(float speed);
-    void moveUp(float speed);
-    void moveDown(float speed);
+    void moveForward(float speed, float deltaTime);
+    void moveBackward(float , float deltaTime);
+    void moveLeft(float speed, float deltaTime);
+    void moveRight(float speed, float deltaTime);
+    void moveUp(float speed, float deltaTime);
+    void moveDown(float speed, float deltaTime);
 
     void calculateVectors();
-    void mouseInput( double x, double y);
+    void mouseInput( double x, double y, float deltaTime);
     glm::vec3 getPosition() const;
+    glm::mat4 getViewMatrix() const;
 private:
     bool firstMove = true;
     float yaw;

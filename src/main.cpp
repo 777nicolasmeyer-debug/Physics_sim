@@ -1,5 +1,4 @@
 #include <iostream>
-#include <ostream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -7,9 +6,10 @@
 #include "../Meshes/Meshes.h"
 #include "../Shader/Shader.h"
 #include "../Camera/camera.h"
-#include "VAO_VBO.h"
-#include "Loaders.h"
-#include "matrix.h"
+#include "../Rendering/VAO_VBO.h"
+#include "../Loaders/Loaders.h"
+#include "../Math/matrix.h"
+#include "../Math/gravity.h"
 #include <vector>
 
 
@@ -22,17 +22,20 @@ VAO_VBO buffers;
 Loaders loader;
 Matrix matrix(WIDTH, HEIGHT);
 Camera camera;
+Gravity gravity;
 
 std::vector<Meshes::Cube> cubes;
 
-static float speed = 0.5f;
+static float speed = 5.0f;
+float deltaTime = 0.0f;
 
 static void spawnCube();
 static void reset();
-static void handle_keyboardInput(GLFWwindow* window);
+static void handle_keyboardInput(GLFWwindow* window, float deltaTime);
 static void mouse(GLFWwindow* window, double xpos, double ypos) {
-    camera.mouseInput(xpos, ypos);
+    camera.mouseInput(xpos, ypos, deltaTime);
 }
+
 int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -69,50 +72,51 @@ int main() {
     auto lastFrame = static_cast<float>(glfwGetTime());
     while (!glfwWindowShouldClose(window)) {
         auto currentFrame = static_cast<float>(glfwGetTime());
-        float deltaTime = currentFrame - lastFrame;
+        deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        handle_keyboardInput(window);
+        handle_keyboardInput(window, deltaTime);
 
         shader.use();
-        shader.loadMatrix("model", matrix.model);
         shader.loadMatrix("projection", matrix.projection);
-        shader.loadMatrix("view", matrix.view);
-        for (const Meshes::Cube& cube1 : cubes) {
-            matrix.Translate(cube1.position);
+        shader.loadMatrix("view", camera.getViewMatrix());
+        for (Meshes::Cube& cube1 : cubes) {
+            gravity.apply(cube1.velocity, deltaTime);
+            cube1.position += cube1.velocity * deltaTime;
+            auto model = glm::mat4(1.0f);
+            model = glm::translate(model, cube1.position);
+            shader.loadMatrix("model", model);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, crateTex);
+            glBindVertexArray(buffers.vao);
+            glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(cube.vertices.size() / 5));
         }
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, crateTex);
-        glBindVertexArray(buffers.vao);
-        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(cube.vertices.size() / 5));
 
         glfwPollEvents();
         glfwSwapBuffers(window);
-        std::ostream operator<<(const std::ostream & lhs, const glm::vec3 & vec);
     }
     glfwTerminate();
 }
 
-void handle_keyboardInput(GLFWwindow* window) {
+void handle_keyboardInput(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_W)) {
-        camera.moveForward(speed);
+        camera.moveForward(speed, deltaTime);
     }
     else if (glfwGetKey(window, GLFW_KEY_S)) {
-        camera.moveBackward(speed);
+        camera.moveBackward(speed, deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_A)) {
-        camera.moveLeft(speed);
+        camera.moveLeft(speed, deltaTime);
     }
     else if (glfwGetKey(window, GLFW_KEY_D)) {
-        camera.moveRight(speed);
+        camera.moveRight(speed, deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE)) {
-        camera.moveUp(speed);
+        camera.moveUp(speed, deltaTime);
     }
     else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) {
-        camera.moveDown(speed);
+        camera.moveDown(speed, deltaTime);
     }
 
     if (glfwGetKey(window, GLFW_KEY_1)) {

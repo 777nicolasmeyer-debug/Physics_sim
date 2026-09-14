@@ -61,4 +61,5 @@ Meshes::Cube::Cube() {
 };
 
     position = glm::vec3(0.0f, 0.0f, 0.0f);
-}
+    velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+};

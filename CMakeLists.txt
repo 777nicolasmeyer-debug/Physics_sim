@@ -10,10 +10,11 @@ find_package(Stb REQUIRED)
 add_executable(Physics_sim
         src/main.cpp
         Meshes/Meshes.cpp
-        src/VAO_VBO.cpp
+        Rendering/VAO_VBO.cpp
         Shader/Shader.cpp
-        src/Loaders.cpp
-        src/matrix.cpp
+        Loaders/Loaders.cpp
+        Math/matrix.cpp
+        Math/gravity.cpp
         Camera/camera.cpp
 )
 

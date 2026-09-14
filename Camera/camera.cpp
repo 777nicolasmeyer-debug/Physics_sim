@@ -12,33 +12,33 @@ Camera::Camera() {
     calculateVectors();
 }
 
-void Camera::moveForward(const float speed) {
-    cameraPos += speed * cameraFront;
+void Camera::moveForward(const float speed, const float deltaTime) {
+    cameraPos += speed * cameraFront * deltaTime;
     calculateVectors();
 }
-void Camera::moveBackward(const float speed) {
-    cameraPos -= speed * cameraFront;
+void Camera::moveBackward(const float speed, const float deltaTime) {
+    cameraPos -= speed * cameraFront * deltaTime;
     calculateVectors();
 }
-void Camera::moveLeft(const float speed) {
-    cameraPos -= speed * cameraRight;
+void Camera::moveLeft(const float speed, const float deltaTime) {
+    cameraPos -= speed * cameraRight * deltaTime;
     calculateVectors();
 }
-void Camera::moveRight(const float speed) {
-    cameraPos += speed * cameraRight;
+void Camera::moveRight(const float speed, const float deltaTime) {
+    cameraPos += speed * cameraRight * deltaTime;
     calculateVectors();
 }
-void Camera::moveUp(const float speed) {
-    cameraPos += speed * cameraUp;
+void Camera::moveUp(const float speed, const float deltaTime) {
+    cameraPos += speed * cameraUp * deltaTime;
     calculateVectors();
 }
-void Camera::moveDown(const float speed) {
-    cameraPos -= speed * cameraUp;
+void Camera::moveDown(const float speed, const float deltaTime) {
+    cameraPos -= speed * cameraUp * deltaTime;
     calculateVectors();
 }
 
-void Camera::mouseInput(double x, double y) {
-    const float sensitivity = 0.1f;
+void Camera::mouseInput(double x, double y, const float deltaTime) {
+    const float sensitivity = 100.0f;
     float Xoffset = static_cast<float>(x) - lastX;
     float Yoffset = static_cast<float>(y) - lastY;
     lastX = static_cast<float>(x);
@@ -47,8 +47,8 @@ void Camera::mouseInput(double x, double y) {
     Xoffset *= sensitivity;
     Yoffset *= sensitivity;
 
-    yaw += Xoffset;
-    pitch += Yoffset;
+    yaw += Xoffset * deltaTime;
+    pitch -= Yoffset * deltaTime;
 
     if (pitch > 89.0f) pitch = 89.0f;
     if (pitch < -89.0f) pitch = -89.0f;
@@ -66,10 +66,14 @@ void Camera::calculateVectors() {
     cameraDirection.z = std::sin(glm::radians(yaw)) * std::cos(glm::radians(pitch));
 
     cameraFront = glm::normalize(cameraDirection);
-    cameraRight = glm::normalize(glm::cross(cameraFront, cameraDirection));
-    cameraUp = glm::normalize(glm::cross(cameraRight, cameraDirection));
+    cameraRight = glm::normalize(glm::cross(cameraFront, up));
+    cameraUp = glm::normalize(glm::cross(cameraRight, cameraFront));
 }
 
 glm::vec3 Camera::getPosition() const {
     return cameraPos;
+}
+
+glm::mat4 Camera::getViewMatrix() const {
+    return glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 }
