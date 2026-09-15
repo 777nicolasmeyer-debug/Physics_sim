@@ -6,132 +6,23 @@
 #define PHYSICS_SIM_MESHES_H
 #include <glm/glm.hpp>
 #include <vector>
+#include <BulletDynamics/Dynamics/btRigidBody.h>
 
 namespace Meshes {
-    inline constexpr std::array<float, 180> CubeVertices = {
-        // Bottom face (y = -0.5)
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.5f, -0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f, -0.5f,  0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.5f, -0.5f, 1.0f, 0.0f, // bottom right
-     0.5f, -0.5f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f, -0.5f,  0.5f, 0.0f, 1.0f, // top left
-
-    // Top face (y = +0.5)
-    -0.5f,  0.5f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f,  0.5f, -0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, // top left
-
-     0.5f,  0.5f, -0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.5f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, // top left
-
-    // Front face (z = +0.5)
-    -0.5f, -0.5f,  0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.5f,  0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.5f,  0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.5f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, // top left
-
-    // Back face (z = -0.5)
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.5f, -0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.5f, -0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.5f, -0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, // top left
-
-    // Left face (x = -0.5)
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, // bottom left
-    -0.5f, -0.5f,  0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, // top left
-
-    -0.5f, -0.5f,  0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.5f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, // top left
-
-    // Right face (x = +0.5)
-     0.5f, -0.5f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.5f,  0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.5f, -0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.5f,  0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.5f,  0.5f, 1.0f, 1.0f, // top right
-     0.5f,  0.5f, -0.5f, 0.0f, 1.0f  // top left
-    };
     struct Cube {
         glm::vec3 position;
-        glm::vec3 velocity;
+        btRigidBody* body;
 
         Cube();
     };
 
-    inline constexpr std::array<float, 180> PlaneVertices = {
-        // Bottom face (y = -0.5)
-    -0.5f, -0.1f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.1f, -0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f, -0.1f,  0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.1f, -0.5f, 1.0f, 0.0f, // bottom right
-     0.5f, -0.1f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f, -0.1f,  0.5f, 0.0f, 1.0f, // top left
-
-    // Top face (y = +0.5)
-    -0.5f,  0.1f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f,  0.1f, -0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.1f,  0.5f, 0.0f, 1.0f, // top left
-
-     0.5f,  0.1f, -0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.1f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.1f,  0.5f, 0.0f, 1.0f, // top left
-
-    // Front face (z = +0.5)
-    -0.5f, -0.1f,  0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.1f,  0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.1f,  0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.1f,  0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.1f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.1f,  0.5f, 0.0f, 1.0f, // top left
-
-    // Back face (z = -0.5)
-    -0.5f, -0.1f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.1f, -0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.1f, -0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.1f, -0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.1f, -0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.1f, -0.5f, 0.0f, 1.0f, // top left
-
-    // Left face (x = -0.5)
-    -0.5f, -0.1f, -0.5f, 0.0f, 0.0f, // bottom left
-    -0.5f, -0.1f,  0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.1f, -0.5f, 0.0f, 1.0f, // top left
-
-    -0.5f, -0.1f,  0.5f, 1.0f, 0.0f, // bottom right
-    -0.5f,  0.1f,  0.5f, 1.0f, 1.0f, // top right
-    -0.5f,  0.1f, -0.5f, 0.0f, 1.0f, // top left
-
-    // Right face (x = +0.5)
-     0.5f, -0.1f, -0.5f, 0.0f, 0.0f, // bottom left
-     0.5f, -0.1f,  0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.1f, -0.5f, 0.0f, 1.0f, // top left
-
-     0.5f, -0.1f,  0.5f, 1.0f, 0.0f, // bottom right
-     0.5f,  0.1f,  0.5f, 1.0f, 1.0f, // top right
-     0.5f,  0.1f, -0.5f, 0.0f, 1.0f  // top left
-    };
     struct Plane {
         glm::vec3 position;
         Plane();
     };
 
-    inline constexpr std::array<float, 360> allVertices = {
-    // CubeVertices
+    inline constexpr std::array<float, 400> allVertices = {
+    // CubeVertices start = 0 count = 36
         // Bottom face (y = -0.5)
     -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, // bottom left
      0.5f, -0.5f, -0.5f, 1.0f, 0.0f, // bottom right
@@ -186,7 +77,7 @@ namespace Meshes {
      0.5f,  0.5f,  0.5f, 1.0f, 1.0f, // top right
      0.5f,  0.5f, -0.5f, 0.0f, 1.0f,  // top left
 
-     // Plane Vertices
+     // Plane Vertices start = 36, count = 36
         // Bottom face (y = -0.5)
     -0.5f, -0.1f, -0.5f, 0.0f, 0.0f, // bottom left
      0.5f, -0.1f, -0.5f, 1.0f, 0.0f, // bottom right
@@ -240,6 +131,15 @@ namespace Meshes {
      0.5f, -0.1f,  0.5f, 1.0f, 0.0f, // bottom right
      0.5f,  0.1f,  0.5f, 1.0f, 1.0f, // top right
      0.5f,  0.1f, -0.5f, 0.0f, 1.0f,  // top left
+
+     //infinite plane start 72 count 6
+     -0.5f,  0.0f, -0.5f, 0.0f, 0.0f, // bottom left
+     0.5f,  0.0f, -0.5f, 1.0f, 0.0f, // bottom right
+    -0.5f,  0.0f,  0.5f, 0.0f, 1.0f, // top left
+
+     0.5f,  0.0f, -0.5f, 1.0f, 0.0f, // bottom right
+     0.5f,  0.0f,  0.5f, 1.0f, 1.0f, // top right
+    -0.5f,  0.0f,  0.5f, 0.0f, 1.0f, // top left
     };
 }
 #endif //PHYSICS_SIM_MESHES_H

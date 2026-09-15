@@ -10,6 +10,7 @@
 #include "../Loaders/Loaders.h"
 #include "../Math/matrix.h"
 #include "../Math/gravity.h"
+#include "../Math/Collisions.h"
 #include <vector>
 
 
@@ -24,6 +25,7 @@ Loaders loader;
 Matrix matrix(WIDTH, HEIGHT);
 Camera camera;
 Gravity gravity;
+Collisions collisions;
 
 std::vector<Meshes::Cube> cubes;
 
@@ -58,10 +60,13 @@ int main() {
     glViewport(0, 0, WIDTH, HEIGHT);
     glEnable(GL_DEPTH_TEST);
 
+    collisions.init();
+
     buffers.createVBO();
     buffers.createVAO();
 
     unsigned int crateTex = loader.loadImageFromFile("../assets/crate.png");
+    unsigned int planeTex = loader.loadImageFromFile("../assets/plane.png");
     shader.createShaders("../Shader/vertex.glsl", "../Shader/fragment.glsl");
     shader.use();
 
@@ -75,6 +80,7 @@ int main() {
         auto currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+        collisions.update(deltaTime);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         handle_keyboardInput(window);
@@ -84,11 +90,19 @@ int main() {
         shader.loadMatrix("view", camera.getViewMatrix());
 
         //cube
-        for (Meshes::Cube& cube1 : cubes) {
-            gravity.apply(cube1.velocity, deltaTime);
-            cube1.position += cube1.velocity * deltaTime;
+       for (Meshes::Cube& cube1 : cubes) {
+            btTransform transform;
+
+            cube1.body -> getMotionState()->getWorldTransform(transform);
+            cube1.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
+
+            btQuaternion rotation = transform.getRotation();
+            glm::quat orientation(rotation.w(), rotation.x(), rotation.y(), rotation.z());
+            glm::mat4 rotation1 = glm::mat4_cast(orientation);
+
             auto model = glm::mat4(1.0f);
             model = glm::translate(model, cube1.position);
+            model *= rotation1;
             shader.loadMatrix("model", model);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, crateTex);
@@ -99,11 +113,11 @@ int main() {
         plane.position.y = -20.f;
         auto model = glm::mat4(1.0f);
         model = glm::translate(model, plane.position);
-        model = glm::scale(model,glm::vec3(10.0f, 1.0f, 10.0f));
+        model = glm::scale(model,glm::vec3(100.0f, 1.0f, 100.0f));
         shader.loadMatrix("model", model);
-        glBindTexture(GL_TEXTURE_2D, crateTex);
+        glBindTexture(GL_TEXTURE_2D, planeTex);
         glBindVertexArray(buffers.vao);
-        glDrawArrays(GL_TRIANGLES, 36, 36);
+        glDrawArrays(GL_TRIANGLES, 72, 6);
 
         glfwPollEvents();
         glfwSwapBuffers(window);
@@ -153,7 +167,7 @@ void handle_keyboardInput(GLFWwindow* window) {
 void spawnCube() {
     Meshes::Cube cube1;
     cube1.position = camera.getPosition();
-    cube1.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    cube1.body = collisions.spawnCube(cube1.position);
     cubes.push_back(cube1);
 }
 
