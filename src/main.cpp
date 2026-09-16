@@ -13,14 +13,13 @@
 #include "../Math/Collisions.h"
 #include <vector>
 
+#include "../Scene/SceneManager.h"
+
 
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
 
 Shader shader;
-Meshes::Cube cube;
-Meshes::Plane plane;
-VAO_VBO buffers;
 Loaders loader;
 Matrix matrix(WIDTH, HEIGHT);
 Camera camera;
@@ -28,18 +27,22 @@ Gravity gravity;
 Collisions collisions;
 
 tinygltf::Model Object1;
-std::vector<Meshes::Cube> cubes;
+VAO_VBO objectBuffers;
+VAO_VBO buffers;
+std::vector<SceneObject> sceneObjects;
 
 static float speed = 5.0f;
 static float deltaTime = 0.0f;
 
-static void spawnCube();
+static void spawnObject1();
 static void reset();
 static void handle_keyboardInput(GLFWwindow* window);
 static void mouse(GLFWwindow* window, double xpos, double ypos) {
     camera.mouseInput(xpos, ypos, deltaTime);
 }
 
+unsigned int crateTex;
+unsigned int planeTex;
 int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -54,23 +57,17 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouse);
 
-
     if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
         std::cerr << "Failed to initialize GLAD" << std::endl;
     }
     glViewport(0, 0, WIDTH, HEIGHT);
     glEnable(GL_DEPTH_TEST);
 
+    crateTex = loader.loadImageFromFile("../assets/crate.png");
+    planeTex = loader.loadImageFromFile("../assets/plane.png");
+
+
     collisions.init();
-
-    buffers.createVBO();
-    buffers.createVAO();
-
-    unsigned int crateTex = loader.loadImageFromFile("../assets/crate.png");
-    unsigned int planeTex = loader.loadImageFromFile("../assets/plane.png");
-    if (loader.loadModelFromFile("../assets/Object1.glb", Object1)) {
-        MeshData object1 = loader.extractMeshData(Object1, 0);
-    }
     shader.createShaders("../Shader/vertex.glsl", "../Shader/fragment.glsl");
     shader.use();
 
@@ -93,36 +90,9 @@ int main() {
         shader.loadMatrix("projection", matrix.projection);
         shader.loadMatrix("view", camera.getViewMatrix());
 
-        //cube
-       for (Meshes::Cube& cube1 : cubes) {
-            btTransform transform;
-
-            cube1.body -> getMotionState()->getWorldTransform(transform);
-            cube1.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
-
-            btQuaternion rotation = transform.getRotation();
-            glm::quat orientation(rotation.w(), rotation.x(), rotation.y(), rotation.z());
-            glm::mat4 rotation1 = glm::mat4_cast(orientation);
-
-            auto model = glm::mat4(1.0f);
-            model = glm::translate(model, cube1.position);
-            model *= rotation1;
-            shader.loadMatrix("model", model);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, crateTex);
-            glBindVertexArray(buffers.vao);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+        for (auto& obj : sceneObjects) {
+            obj.draw(shader);
         }
-        //plane
-        plane.position.y = -20.f;
-        auto model = glm::mat4(1.0f);
-        model = glm::translate(model, plane.position);
-        model = glm::scale(model,glm::vec3(100.0f, 1.0f, 100.0f));
-        shader.loadMatrix("model", model);
-        glBindTexture(GL_TEXTURE_2D, planeTex);
-        glBindVertexArray(buffers.vao);
-        glDrawArrays(GL_TRIANGLES, 72, 6);
-
         glfwPollEvents();
         glfwSwapBuffers(window);
     }
@@ -130,6 +100,7 @@ int main() {
 }
 
 static bool SpawnCubeWasDown = false;
+static bool SpawnObjectWasDown = false;
 void handle_keyboardInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
         glfwSetWindowShouldClose(window, true);
@@ -154,27 +125,36 @@ void handle_keyboardInput(GLFWwindow* window) {
         camera.moveDown(speed, deltaTime);
     }
 
-    if (glfwGetKey(window, GLFW_KEY_1)) {
-        if (!SpawnCubeWasDown) {
-            spawnCube();
-            SpawnCubeWasDown = true;
-        }
-    }
-    else {
-        SpawnCubeWasDown = false;
-    }
     if (glfwGetKey(window, GLFW_KEY_R)) {
         reset();
     }
+    if (glfwGetKey(window, GLFW_KEY_2)) {
+        if (!SpawnObjectWasDown) {
+            spawnObject1();
+            SpawnObjectWasDown = true;
+        }
+    }
+    else {
+        SpawnObjectWasDown = false;
+    }
 }
 
-void spawnCube() {
-    Meshes::Cube cube1;
-    cube1.position = camera.getPosition();
-    cube1.body = collisions.spawnCube(cube1.position);
-    cubes.push_back(cube1);
+void spawnObject1() {
+    MeshData object1;
+    glBindTexture(GL_TEXTURE_2D, crateTex);
+    if (loader.loadModelFromFile("../assets/Object1.glb", Object1)) {
+        object1 = loader.extractMeshData(Object1, 0);
+        SceneObject obj;
+        obj.buffers.init(object1);
+        obj.position = camera.getPosition();
+        obj.textureID = crateTex;
+        obj.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+        obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+        sceneObjects.push_back(obj);
+    }
+
 }
 
 void reset() {
-    cubes.clear();
+    sceneObjects.clear();
 }

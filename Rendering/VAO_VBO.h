@@ -9,10 +9,12 @@
 
 class VAO_VBO {
 public:
-    GLuint vbo;
     GLuint vao;
-    void createVAO();
-    void createVBO();
+    GLuint vbo;
+    GLuint ebo;
+    GLsizei indexCount;
+    void init(const MeshData& meshData);
+    void draw() const;
 };
 
 #endif //PHYSICS_SIM_VAO_VBO_H

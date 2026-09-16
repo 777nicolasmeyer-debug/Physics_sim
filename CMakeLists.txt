@@ -22,6 +22,8 @@ add_executable(Physics_sim
         Math/gravity.cpp
         Camera/camera.cpp
         Math/Collisions.cpp
+        src/loaders_implementation.cpp
+        Scene/SceneManager.cpp
 )
 
 target_link_libraries(Physics_sim PRIVATE
