@@ -142,4 +142,9 @@ namespace Meshes {
     -0.5f,  0.0f,  0.5f, 0.0f, 1.0f, // top left
     };
 }
+
+struct MeshData {
+ std::vector<float> vertices;
+ std::vector<unsigned int> indices;
+};
 #endif //PHYSICS_SIM_MESHES_H

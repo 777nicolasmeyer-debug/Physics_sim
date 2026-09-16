@@ -8,6 +8,10 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(Bullet CONFIG REQUIRED)
 
+find_path(TINYGLTF_INCLUDE_DIR tiny_gltf.h
+        PATHS ${VCPKG_ROOT}/installed/x64-mingw-dynamic/include
+)
+
 add_executable(Physics_sim
         src/main.cpp
         Meshes/Meshes.cpp
@@ -29,5 +33,6 @@ target_link_libraries(Physics_sim PRIVATE
 )
 
 target_include_directories(Physics_sim PRIVATE
-    &{Stb_INCLUDE_DIR}
+    ${Stb_INCLUDE_DIR}
+        ${TINYGLTF_INCLUDE_DIR}
 )

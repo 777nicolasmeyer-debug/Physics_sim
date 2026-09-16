@@ -27,6 +27,7 @@ Camera camera;
 Gravity gravity;
 Collisions collisions;
 
+tinygltf::Model Object1;
 std::vector<Meshes::Cube> cubes;
 
 static float speed = 5.0f;
@@ -67,6 +68,9 @@ int main() {
 
     unsigned int crateTex = loader.loadImageFromFile("../assets/crate.png");
     unsigned int planeTex = loader.loadImageFromFile("../assets/plane.png");
+    if (loader.loadModelFromFile("../assets/Object1.glb", Object1)) {
+        MeshData object1 = loader.extractMeshData(Object1, 0);
+    }
     shader.createShaders("../Shader/vertex.glsl", "../Shader/fragment.glsl");
     shader.use();
 
