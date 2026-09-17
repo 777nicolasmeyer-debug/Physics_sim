@@ -6,11 +6,18 @@
 #define PHYSICS_SIM_LOADERS_H
 #include "stb_image.h"
 #include <glad/glad.h>
+#include "../Meshes/Meshes.h"
+#include <tiny_gltf.h>
 
 class Loaders {
 public:
     unsigned int loadImageFromFile(const char* path);
     unsigned int texture;
+
+    void loadModelFromFile(const char* path, tinygltf::Model& model);
+    bool PrimitiveCount = false;
+
+    MeshData extractMeshData(const tinygltf::Model& model, int meshIndex);
 private:
     unsigned char* data;
 };
