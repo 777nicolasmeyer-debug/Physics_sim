@@ -27,6 +27,31 @@ void Collisions::init() {
     btRigidBody::btRigidBodyConstructionInfo groundCI(0, groundMotionState, groundShape, btVector3(0,0,0));
     btRigidBody* groundBody = new btRigidBody(groundCI);
     dynamicsWorld->addRigidBody(groundBody);
+
+}
+
+btRigidBody* Collisions::convexShapeS(SceneObject& sceneObj, const MeshData& mesh) {
+    btTransform transform;
+    transform.setIdentity();
+    transform.setOrigin(btVector3(sceneObj.position.x, sceneObj.position.y, sceneObj.position.z));
+    btDefaultMotionState* motionState = new btDefaultMotionState(transform);
+
+    btConvexHullShape* hull = new btConvexHullShape();
+    for (size_t i = 0; i < mesh.vertices.size(); i += 8) {
+        btVector3 point(mesh.vertices[i], mesh.vertices[i + 1], mesh.vertices[i + 2]);
+        hull->addPoint(point);
+    }
+
+    hull->initializePolyhedralFeatures();
+    btScalar mass = 0.0f;
+    btVector3 inertia(0,0,0);
+
+    btRigidBody::btRigidBodyConstructionInfo rInfo(mass, motionState, hull, inertia);
+    sceneObj.body = new btRigidBody(rInfo);
+
+    dynamicsWorld->addRigidBody(sceneObj.body);
+
+    return sceneObj.body;
 }
 
 void Collisions::update(float dt) {

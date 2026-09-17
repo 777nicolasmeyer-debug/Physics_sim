@@ -27,11 +27,13 @@ Gravity gravity;
 Collisions collisions;
 
 std::vector<SceneObject> sceneObjects;
+std::vector<SceneObject> terrainObjects;
 
 static float speed = 5.0f;
 static float deltaTime = 0.0f;
 
 static void spawnObject1();
+static void terainInit();
 static void reset();
 static void handle_keyboardInput(GLFWwindow* window);
 static void mouse(GLFWwindow* window, double xpos, double ypos) {
@@ -40,6 +42,7 @@ static void mouse(GLFWwindow* window, double xpos, double ypos) {
 
 unsigned int crateTex;
 unsigned int planeTex;
+unsigned int terrainTex;
 int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -59,9 +62,13 @@ int main() {
     }
     glViewport(0, 0, WIDTH, HEIGHT);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
     crateTex = loader.loadImageFromFile("../assets/crate.png");
     planeTex = loader.loadImageFromFile("../assets/plane.png");
+    terrainTex = loader.loadImageFromFile("../assets/Terrain.png");
 
 
     collisions.init();
@@ -70,7 +77,7 @@ int main() {
 
     shader.loadTexture("tex", 0);
 
-
+    terainInit();
     glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
 
     auto lastFrame = static_cast<float>(glfwGetTime());
@@ -80,7 +87,6 @@ int main() {
         lastFrame = currentFrame;
         collisions.update(deltaTime);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         handle_keyboardInput(window);
 
         shader.use();
@@ -89,6 +95,26 @@ int main() {
 
 
         for (auto& obj : sceneObjects) {
+            btTransform transform;
+
+            obj.body -> getMotionState()->getWorldTransform(transform);
+            obj.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
+
+            glm::quat orientation(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
+            obj.rotation = orientation;
+
+            auto model = glm::mat4(1.0f);
+            model = glm::translate(model, obj.position);
+            model *= glm::mat4_cast(obj.rotation);
+            model = glm::scale(model, obj.scale);
+
+            shader.loadMatrix("model", model);
+            obj.draw(shader);
+
+            shader.loadMatrix("model", model);
+            obj.draw(shader);
+        }
+        for (auto& obj : terrainObjects) {
             btTransform transform;
 
             obj.body -> getMotionState()->getWorldTransform(transform);
@@ -164,6 +190,21 @@ void handle_keyboardInput(GLFWwindow* window) {
     }
 }
 
+void terainInit() {
+    tinygltf::Model model;
+    MeshData terrainData;
+    loader.loadModelFromFile("../assets/Terrain.glb", model);
+    terrainData = loader.extractMeshData(model, 0);
+
+    SceneObject obj;
+    obj.buffers.init(terrainData);
+    obj.position = glm::vec3(0.0f, 0.0f, 0.0f);
+    obj.rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
+    obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+    obj.textureID = terrainTex;
+    collisions.convexShapeS(obj, terrainData);
+    terrainObjects.push_back(obj);
+}
 
 void spawnObject1() {
     tinygltf::Model Object;
@@ -184,7 +225,7 @@ void spawnObject1() {
     Object = tinygltf::Model();
     objectData.vertices.clear();
     objectData.indices.clear();
-    }
+}
 
 
 
