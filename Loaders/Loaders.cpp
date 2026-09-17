@@ -38,36 +38,60 @@ unsigned int Loaders::loadImageFromFile(const char* path) {
     return textureID;
 }
 
-// Load a glTF model from file
-bool Loaders::loadModelFromFile(const char* path, tinygltf::Model& model) {
+void Loaders::loadModelFromFile(const char* path, tinygltf::Model& model) {
     tinygltf::TinyGLTF loader;
-    std::string err, warn;
+    std::string err;
+    std::string warn;
 
-    bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, path);
-    if (!warn.empty()) std::cout << "Warn: " << warn << std::endl;
-    if (!err.empty()) std::cerr << "Err: " << err << std::endl;
+    bool ret = false;
+
+    // Decide whether to load binary (.glb) or ASCII (.gltf)
+    std::string filePath(path);
+    if (filePath.size() >= 5 && filePath.substr(filePath.size() - 5) == ".gltf") {
+        ret = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+    } else {
+        ret = loader.LoadBinaryFromFile(&model, &err, &warn, path);
+    }
+
+    if (!warn.empty()) {
+        std::cout << "TinyGLTF warning: " << warn << std::endl;
+    }
+    if (!err.empty()) {
+        std::cerr << "TinyGLTF error: " << err << std::endl;
+    }
 
     if (!ret) {
-        std::cerr << "Failed to load glTF: " << path << std::endl;
-        return false;
+        std::cerr << "Failed to load model: " << path << std::endl;
     }
-    return true;
+
+    std::cout << "Successfully loaded model: " << path << std::endl;
 }
 
-// Extract mesh data (positions + UVs + indices)
+// Load a glTF model from file
+// Extract mesh data (positions + normals + UVs + indices)
 MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
     MeshData data;
     const tinygltf::Mesh& mesh = model.meshes[meshIndex];
 
     for (const auto& primitive : mesh.primitives) {
-        // Positions
+        // POSITION
         const tinygltf::Accessor& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
         const tinygltf::BufferView& posView = model.bufferViews[posAccessor.bufferView];
         const tinygltf::Buffer& posBuffer = model.buffers[posView.buffer];
         const float* positions = reinterpret_cast<const float*>(
             &posBuffer.data[posView.byteOffset + posAccessor.byteOffset]);
 
-        // UVs
+        // NORMAL
+        const float* normals = nullptr;
+        if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
+            const tinygltf::Accessor& normAccessor = model.accessors[primitive.attributes.at("NORMAL")];
+            const tinygltf::BufferView& normView = model.bufferViews[normAccessor.bufferView];
+            const tinygltf::Buffer& normBuffer = model.buffers[normView.buffer];
+            normals = reinterpret_cast<const float*>(
+                &normBuffer.data[normView.byteOffset + normAccessor.byteOffset]);
+        }
+
+        // TEXCOORD_0
         const float* uvs = nullptr;
         if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end()) {
             const tinygltf::Accessor& uvAccessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
@@ -76,31 +100,93 @@ MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
             uvs = reinterpret_cast<const float*>(
                 &uvBuffer.data[uvView.byteOffset + uvAccessor.byteOffset]);
         }
-
-        // Fill vertex buffer
-        for (size_t i = 0; i < posAccessor.count; ++i) {
-            data.vertices.push_back(positions[i * 3 + 0]);
-            data.vertices.push_back(positions[i * 3 + 1]);
-            data.vertices.push_back(positions[i * 3 + 2]);
-
-            if (uvs) {
-                data.vertices.push_back(uvs[i * 2 + 0]);
-                data.vertices.push_back(uvs[i * 2 + 1]);
-            } else {
-                data.vertices.push_back(0.0f);
-                data.vertices.push_back(0.0f);
-            }
+        const tinygltf::Accessor* normAccessor = nullptr;
+        if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
+            normAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
+        }
+        const tinygltf::Accessor* uvAccessor = nullptr;
+        if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end()) {
+            uvAccessor = &model.accessors[primitive.attributes.at("TEXCOORD_0")];
         }
 
-        // Indices (outside the vertex loop!)
+
+        // INDICES
         const tinygltf::Accessor& idxAccessor = model.accessors[primitive.indices];
         const tinygltf::BufferView& idxView = model.bufferViews[idxAccessor.bufferView];
         const tinygltf::Buffer& idxBuffer = model.buffers[idxView.buffer];
-        const unsigned short* indices = reinterpret_cast<const unsigned short*>(
-            &idxBuffer.data[idxView.byteOffset + idxAccessor.byteOffset]);
+        const unsigned char* base = &idxBuffer.data[idxView.byteOffset + idxAccessor.byteOffset];
 
-        data.indices.insert(data.indices.end(), indices, indices + idxAccessor.count);
+
+        // Parse indices according to type
+        std::vector<unsigned int> indices;
+        if (idxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+            const unsigned short* idx = reinterpret_cast<const unsigned short*>(base);
+            indices.assign(idx, idx + idxAccessor.count);
+        } else if (idxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+            const unsigned int* idx = reinterpret_cast<const unsigned int*>(base);
+            indices.assign(idx, idx + idxAccessor.count);
+        } else if (idxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+            const unsigned char* idx = reinterpret_cast<const unsigned char*>(base);
+            indices.assign(idx, idx + idxAccessor.count);
+        }
+
+        // Build vertex buffer per index
+        for (size_t i = 0; i < indices.size(); ++i) {
+            unsigned int idx = indices[i];
+            if (idx >= posAccessor.count) {
+                std::cerr << "Index " << idx << " out of range for positions (count=" << posAccessor.count << ")" << std::endl;
+                continue;
+            }
+
+
+            // Position
+            data.vertices.push_back(positions[idx * 3 + 0]);
+            data.vertices.push_back(positions[idx * 3 + 1]);
+            data.vertices.push_back(positions[idx * 3 + 2]);
+
+            // Normal
+            if (normals) {
+                data.vertices.push_back(normals[idx * 3 + 0]);
+                data.vertices.push_back(normals[idx * 3 + 1]);
+                data.vertices.push_back(normals[idx * 3 + 2]);
+            } else {
+                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f, 0.0f});
+            }
+            if (normals && idx < normAccessor->count) {
+                // safe to read normal
+            } else {
+                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f, 0.0f});
+            }
+
+            // UV
+            if (uvs) {
+                data.vertices.push_back(uvs[idx * 2 + 0]);
+                data.vertices.push_back(uvs[idx * 2 + 1]);
+            } else {
+                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f});
+            }
+
+
+            if (uvs && idx < uvAccessor->count) {
+                // safe to read uv
+            } else {
+                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f});
+            }
+
+
+            // Sequential index into new vertex array
+            data.indices.push_back(static_cast<unsigned int>(i));
+        }
+
+        data.indexType = GL_UNSIGNED_INT; // we generate sequential unsigned int indices
+
+        std::cout << "Vertices: " << data.vertices.size() / 8   // pos(3)+norm(3)+uv(2) = 8 floats per vertex
+                  << " Indices: " << data.indices.size()
+                  << " Primitive indices accessor: " << primitive.indices << std::endl;
     }
+
     return data;
 }
+
+
 

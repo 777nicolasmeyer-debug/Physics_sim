@@ -6,12 +6,15 @@
 #define PHYSICS_SIM_COLLISIONS_H
 #include <glm/glm.hpp>
 #include <bullet/btBulletCollisionCommon.h>
+#include "../Meshes/Meshes.h"
+#include"../Scene/SceneManager.h"
+#include <iostream>
 
 class Collisions {
 public:
     void init();
     void update(float dt);
-    btRigidBody* spawnCube(glm::vec3 pos);
+    btRigidBody* convexShapeD(SceneObject& sceneObj, const MeshData& mesh);
 };
 
 

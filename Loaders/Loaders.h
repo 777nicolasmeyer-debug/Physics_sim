@@ -14,7 +14,8 @@ public:
     unsigned int loadImageFromFile(const char* path);
     unsigned int texture;
 
-    bool loadModelFromFile(const char* path, tinygltf::Model& model);
+    void loadModelFromFile(const char* path, tinygltf::Model& model);
+    bool PrimitiveCount = false;
 
     MeshData extractMeshData(const tinygltf::Model& model, int meshIndex);
 private:

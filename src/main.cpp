@@ -26,9 +26,6 @@ Camera camera;
 Gravity gravity;
 Collisions collisions;
 
-tinygltf::Model Object1;
-VAO_VBO objectBuffers;
-VAO_VBO buffers;
 std::vector<SceneObject> sceneObjects;
 
 static float speed = 5.0f;
@@ -90,11 +87,30 @@ int main() {
         shader.loadMatrix("projection", matrix.projection);
         shader.loadMatrix("view", camera.getViewMatrix());
 
+
         for (auto& obj : sceneObjects) {
+            btTransform transform;
+
+            obj.body -> getMotionState()->getWorldTransform(transform);
+            obj.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
+
+            glm::quat orientation(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
+            obj.rotation = orientation;
+
+            auto model = glm::mat4(1.0f);
+            model = glm::translate(model, obj.position);
+            model *= glm::mat4_cast(obj.rotation);
+            model = glm::scale(model, obj.scale);
+
+            shader.loadMatrix("model", model);
+            obj.draw(shader);
+
+            shader.loadMatrix("model", model);
             obj.draw(shader);
         }
         glfwPollEvents();
         glfwSwapBuffers(window);
+
     }
     glfwTerminate();
 }
@@ -128,6 +144,15 @@ void handle_keyboardInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_R)) {
         reset();
     }
+    /*if (glfwGetKey(window, GLFW_KEY_1)) {
+        if (!SpawnCubeWasDown) {
+            spawnCube();
+            SpawnCubeWasDown = true;
+        }
+    }
+    else {
+        SpawnCubeWasDown = false;
+    }*/
     if (glfwGetKey(window, GLFW_KEY_2)) {
         if (!SpawnObjectWasDown) {
             spawnObject1();
@@ -139,21 +164,29 @@ void handle_keyboardInput(GLFWwindow* window) {
     }
 }
 
+
 void spawnObject1() {
-    MeshData object1;
-    glBindTexture(GL_TEXTURE_2D, crateTex);
-    if (loader.loadModelFromFile("../assets/Object1.glb", Object1)) {
-        object1 = loader.extractMeshData(Object1, 0);
-        SceneObject obj;
-        obj.buffers.init(object1);
-        obj.position = camera.getPosition();
-        obj.textureID = crateTex;
-        obj.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
-        obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
-        sceneObjects.push_back(obj);
+    tinygltf::Model Object;
+    MeshData objectData;
+    loader.loadModelFromFile("../assets/Object1.glb", Object);
+    objectData = loader.extractMeshData(Object, 0);
+
+    SceneObject obj;
+    obj.buffers.init(objectData);
+    obj.position = camera.getPosition();
+    obj.textureID = crateTex;
+    obj.rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
+    obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+    collisions.convexShapeD(obj, objectData);
+    sceneObjects.push_back(obj);
+
+
+    Object = tinygltf::Model();
+    objectData.vertices.clear();
+    objectData.indices.clear();
     }
 
-}
+
 
 void reset() {
     sceneObjects.clear();

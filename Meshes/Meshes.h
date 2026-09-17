@@ -12,5 +12,6 @@
 struct MeshData {
  std::vector<float> vertices;
  std::vector<unsigned int> indices;
+ int indexType;
 };
 #endif //PHYSICS_SIM_MESHES_H

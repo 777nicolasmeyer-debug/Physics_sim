@@ -9,13 +9,15 @@
 #include "../Rendering/VAO_VBO.h"
 #include "../Shader/Shader.h"
 #include <glm/glm.hpp>
+#include <glm/detail/type_quat.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 struct SceneObject {
     VAO_VBO buffers;
     glm::vec3 position{0.0f};
-    glm::vec3 rotation{0.0f};
+    glm::quat rotation;
     glm::vec3 scale{1.0f};
+    btRigidBody* body;
     GLuint textureID;
 
     void draw(Shader& shader);
