@@ -202,7 +202,7 @@ void terainInit() {
     obj.rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
     obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     obj.textureID = terrainTex;
-    collisions.convexShapeS(obj, terrainData);
+    collisions.triangleShapeS(obj, terrainData);
     terrainObjects.push_back(obj);
 }
 

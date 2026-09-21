@@ -30,23 +30,31 @@ void Collisions::init() {
 
 }
 
-btRigidBody* Collisions::convexShapeS(SceneObject& sceneObj, const MeshData& mesh) {
+btRigidBody* Collisions::triangleShapeS(SceneObject& sceneObj, const MeshData& mesh) {
     btTransform transform;
     transform.setIdentity();
     transform.setOrigin(btVector3(sceneObj.position.x, sceneObj.position.y, sceneObj.position.z));
     btDefaultMotionState* motionState = new btDefaultMotionState(transform);
 
-    btConvexHullShape* hull = new btConvexHullShape();
-    for (size_t i = 0; i < mesh.vertices.size(); i += 8) {
-        btVector3 point(mesh.vertices[i], mesh.vertices[i + 1], mesh.vertices[i + 2]);
-        hull->addPoint(point);
+    btTriangleMesh* triMesh = new btTriangleMesh();
+    for (size_t i = 0; i < mesh.indices.size(); i += 3) {
+        int i0 = mesh.indices[i] * 8;
+        int i1 = mesh.indices[i+1] * 8;
+        int i2 = mesh.indices[i+2] * 8;
+
+        btVector3 v0(mesh.vertices[i0], mesh.vertices[i0+1], mesh.vertices[i0+2]);
+        btVector3 v1(mesh.vertices[i1], mesh.vertices[i1+1], mesh.vertices[i1+2]);
+        btVector3 v2(mesh.vertices[i2], mesh.vertices[i2+1], mesh.vertices[i2+2]);
+
+        triMesh->addTriangle(v0, v1, v2);
     }
 
-    hull->initializePolyhedralFeatures();
+    btBvhTriangleMeshShape* triShape = new btBvhTriangleMeshShape(triMesh, true);
+
     btScalar mass = 0.0f;
     btVector3 inertia(0,0,0);
 
-    btRigidBody::btRigidBodyConstructionInfo rInfo(mass, motionState, hull, inertia);
+    btRigidBody::btRigidBodyConstructionInfo rInfo(mass, motionState, triShape, inertia);
     sceneObj.body = new btRigidBody(rInfo);
 
     dynamicsWorld->addRigidBody(sceneObj.body);
