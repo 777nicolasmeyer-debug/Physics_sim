@@ -24,6 +24,7 @@ add_executable(Physics_sim
         Math/Collisions.cpp
         src/loaders_implementation.cpp
         Scene/SceneManager.cpp
+        Math/Lighting.cpp
 )
 
 target_link_libraries(Physics_sim PRIVATE

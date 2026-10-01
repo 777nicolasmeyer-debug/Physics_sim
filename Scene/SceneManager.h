@@ -23,5 +23,14 @@ struct SceneObject {
     void draw(Shader& shader);
 };
 
+struct LightingObject {
+    VAO_VBO buffers;
+    glm::vec3 position{0.0f};
+    glm::vec3 color{1.0f, 1.0f, 1.0f};
+    btRigidBody* body;
+
+    void draw(Shader& shader);
+};
+
 
 #endif //PHYSICS_SIM_SCENEMANAGER_H

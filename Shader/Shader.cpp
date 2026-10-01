@@ -79,6 +79,11 @@ void Shader::loadMatrix(const char *name, const glm::mat4 &matrix) {
     glUniformMatrix4fv(glGetUniformLocation(ID, name), 1, GL_FALSE, glm::value_ptr(matrix));
 }
 
+void Shader::loadVector3(const char * name, const glm::vec3 & vector) {
+    glGetUniformLocation(ID, name);
+    glUniform3fv(glGetUniformLocation(ID, name), 1, glm::value_ptr(vector));
+}
+
 void Shader::loadTexture(const char* name, int textureunit) {
     unsigned int location = glGetUniformLocation(ID, name);
     glUniform1i(location, textureunit);

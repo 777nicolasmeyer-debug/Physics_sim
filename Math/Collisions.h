@@ -15,7 +15,7 @@ public:
     void init();
     void update(float dt);
     btRigidBody* convexShapeD(SceneObject& sceneObj, const MeshData& mesh);
-    btRigidBody* convexShapeS(SceneObject& sceneObj, const MeshData& mesh);
+    btRigidBody* triangleShapeS(SceneObject& sceneObj, const MeshData& mesh);
 };
 
 

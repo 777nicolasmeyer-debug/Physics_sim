@@ -28,10 +28,12 @@ Collisions collisions;
 
 std::vector<SceneObject> sceneObjects;
 std::vector<SceneObject> terrainObjects;
+std::vector<LightingObject> lights;
 
 static float speed = 5.0f;
 static float deltaTime = 0.0f;
 
+static void spawnLight();
 static void spawnObject1();
 static void terainInit();
 static void reset();
@@ -68,7 +70,7 @@ int main() {
 
     crateTex = loader.loadImageFromFile("../assets/crate.png");
     planeTex = loader.loadImageFromFile("../assets/plane.png");
-    terrainTex = loader.loadImageFromFile("../assets/Terrain.png");
+    terrainTex = loader.loadImageFromFile("../assets/Wood_Tower_Col.png");
 
 
     collisions.init();
@@ -93,7 +95,9 @@ int main() {
         shader.loadMatrix("projection", matrix.projection);
         shader.loadMatrix("view", camera.getViewMatrix());
 
-
+        for (auto& light : lights) {
+            light.draw(shader);
+        }
         for (auto& obj : sceneObjects) {
             btTransform transform;
 
@@ -141,7 +145,7 @@ int main() {
     glfwTerminate();
 }
 
-static bool SpawnCubeWasDown = false;
+static bool SpawnLightWasDown = false;
 static bool SpawnObjectWasDown = false;
 void handle_keyboardInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
@@ -170,15 +174,16 @@ void handle_keyboardInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_R)) {
         reset();
     }
-    /*if (glfwGetKey(window, GLFW_KEY_1)) {
-        if (!SpawnCubeWasDown) {
-            spawnCube();
-            SpawnCubeWasDown = true;
+    if (glfwGetKey(window, GLFW_KEY_L)) {
+        if (!SpawnLightWasDown) {
+            spawnLight();
+            SpawnLightWasDown = true;
         }
     }
     else {
-        SpawnCubeWasDown = false;
-    }*/
+        SpawnLightWasDown = false;
+    }
+
     if (glfwGetKey(window, GLFW_KEY_2)) {
         if (!SpawnObjectWasDown) {
             spawnObject1();
@@ -193,7 +198,7 @@ void handle_keyboardInput(GLFWwindow* window) {
 void terainInit() {
     tinygltf::Model model;
     MeshData terrainData;
-    loader.loadModelFromFile("../assets/Terrain.glb", model);
+    loader.loadModelFromFile("../assets/WatchTower.glb", model);
     terrainData = loader.extractMeshData(model, 0);
 
     SceneObject obj;
@@ -202,8 +207,20 @@ void terainInit() {
     obj.rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
     obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     obj.textureID = terrainTex;
-    collisions.convexShapeS(obj, terrainData);
+    collisions.triangleShapeS(obj, terrainData);
     terrainObjects.push_back(obj);
+}
+
+void spawnLight() {
+    tinygltf::Model model;
+    MeshData lightData;
+    loader.loadModelFromFile("../assets/Light.glb", model);
+    lightData = loader.extractMeshData(model, 0);
+
+    LightingObject obj;
+    obj.buffers.init(lightData);
+    obj.position = camera.getPosition();
+    lights.push_back(obj);
 }
 
 void spawnObject1() {
@@ -231,4 +248,5 @@ void spawnObject1() {
 
 void reset() {
     sceneObjects.clear();
+    lights.clear();
 }

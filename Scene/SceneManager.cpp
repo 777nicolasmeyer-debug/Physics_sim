@@ -17,3 +17,13 @@ void SceneObject::draw(Shader& shader) {
     glBindTexture(GL_TEXTURE_2D, textureID);
     buffers.draw();
 }
+
+void LightingObject::draw(Shader& shader) {
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, position);
+
+    shader.loadVector3("lightColor", color);
+    shader.loadVector3("lightPos", position);
+    shader.loadMatrix("model", model);
+    buffers.draw();
+}
