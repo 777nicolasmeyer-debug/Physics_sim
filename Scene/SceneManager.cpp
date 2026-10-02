@@ -13,6 +13,7 @@ void SceneObject::draw(Shader& shader) {
     model = glm::scale(model, scale);
 
     shader.loadMatrix("model", model);
+    shader.loadVector4("baseColor", baseColor);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureID);
     buffers.draw();

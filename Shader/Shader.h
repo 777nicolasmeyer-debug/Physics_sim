@@ -17,6 +17,7 @@ public:
     void use();
     void loadMatrix(const char * name, const glm::mat4 & matrix);
     void loadVector3(const char * name, const glm::vec3 & vector);
+    void loadVector4(const char * name, const glm::vec4 & vector);
     void loadTexture(const char* name, int textureUnit);
 
 };

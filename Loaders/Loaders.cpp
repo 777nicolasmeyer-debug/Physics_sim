@@ -67,6 +67,47 @@ void Loaders::loadModelFromFile(const char* path, tinygltf::Model& model) {
     std::cout << "Successfully loaded model: " << path << std::endl;
 }
 
+GLuint Loaders::createTextureFromImage(const tinygltf::Image& image) {
+    GLuint tex;
+
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+
+    GLenum format = image.component == 4 ? GL_RGBA : GL_RGB;
+
+    glTexImage2D(GL_TEXTURE_2D, 0, format, image.width, image.height, 0, format, GL_UNSIGNED_BYTE, image.image.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    return tex;
+}
+
+GLuint Loaders::createWhiteTexture()
+{
+    GLuint tex;
+
+    unsigned char whitePixel[] = {
+        255, 255, 255, 255
+    };
+
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,1,1,0,GL_RGBA,GL_UNSIGNED_BYTE,whitePixel);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+
+    return tex;
+}
+
+Loaders::Loaders() {
+    whiteTexture = createWhiteTexture();
+}
+
 // Load a glTF model from file
 // Extract mesh data (positions + normals + UVs + indices)
 MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
@@ -74,6 +115,22 @@ MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
     const tinygltf::Mesh& mesh = model.meshes[meshIndex];
 
     for (const auto& primitive : mesh.primitives) {
+        if (primitive.material >= 0) {
+            const auto& material = model.materials[primitive.material];
+
+            int colorTex = material.pbrMetallicRoughness.baseColorTexture.index;
+
+            if (colorTex >= 0) {
+                const auto& texture = model.textures[colorTex];
+                const auto& image = model.images[texture.source];
+                data.textureID = createTextureFromImage(image);
+            }
+            else {
+                auto color = material.pbrMetallicRoughness.baseColorFactor;
+                data.baseColor = glm::vec4(static_cast<float>(color[0]), static_cast<float>(color[1]), static_cast<float>(color[2]), static_cast<float>(color[3]));
+                data.textureID = whiteTexture;
+            }
+        }
         // POSITION
         const tinygltf::Accessor& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
         const tinygltf::BufferView& posView = model.bufferViews[posAccessor.bufferView];
@@ -145,33 +202,41 @@ MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
             data.vertices.push_back(positions[idx * 3 + 2]);
 
             // Normal
-            if (normals) {
+            if (normals && normAccessor && idx < normAccessor->count) {
                 data.vertices.push_back(normals[idx * 3 + 0]);
                 data.vertices.push_back(normals[idx * 3 + 1]);
                 data.vertices.push_back(normals[idx * 3 + 2]);
-            } else {
-                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f, 0.0f});
             }
-            if (normals && idx < normAccessor->count) {
+            else {
+                data.vertices.insert(
+                    data.vertices.end(),
+                    {0.0f,0.0f,0.0f}
+                );
+            }
+          /*  if (normals && idx < normAccessor->count) {
                 // safe to read normal
             } else {
                 data.vertices.insert(data.vertices.end(), {0.0f, 0.0f, 0.0f});
-            }
+            } */
 
             // UV
-            if (uvs) {
+            if (uvs && uvAccessor && idx < uvAccessor->count) {
                 data.vertices.push_back(uvs[idx * 2 + 0]);
                 data.vertices.push_back(uvs[idx * 2 + 1]);
-            } else {
-                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f});
+            }
+            else {
+                data.vertices.insert(
+                    data.vertices.end(),
+                    {0.0f,0.0f}
+                );
             }
 
 
-            if (uvs && idx < uvAccessor->count) {
+            /*if (uvs && idx < uvAccessor->count) {
                 // safe to read uv
             } else {
                 data.vertices.insert(data.vertices.end(), {0.0f, 0.0f});
-            }
+            } */
 
 
             // Sequential index into new vertex array
@@ -183,6 +248,13 @@ MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
         std::cout << "Vertices: " << data.vertices.size() / 8   // pos(3)+norm(3)+uv(2) = 8 floats per vertex
                   << " Indices: " << data.indices.size()
                   << " Primitive indices accessor: " << primitive.indices << std::endl;
+        std::cout << "Images: " << model.images.size() << std::endl;
+        std::cout << "Textures: " << model.textures.size() << std::endl;
+        std::cout << "Materials: " << model.materials.size() << std::endl;
+        std::cout << "Mesh count: "<< model.meshes.size()<< std::endl;
+        std::cout << "Primitive count: "<< model.meshes[0].primitives.size()<< std::endl;
+        std::cout << "Primitive material: "<< primitive.material<< std::endl;
+
     }
 
     return data;

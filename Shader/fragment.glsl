@@ -9,6 +9,7 @@ uniform sampler2D tex;
 uniform vec3 lightColor;
 uniform vec3 lightPos;
 uniform vec3 viewPos;
+uniform vec4 baseColor;
 
 void main() {
     vec3 norm = normalize(Normal);
@@ -26,5 +27,5 @@ void main() {
 
     vec3 lighting = ambient + diffuse + specular;
 
-    frag = texture(tex, texCoord) * vec4(lighting, 1.0);
+    frag = texture(tex, texCoord) * baseColor * vec4(lighting, 1.0);
 }

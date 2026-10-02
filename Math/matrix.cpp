@@ -20,5 +20,5 @@ void Matrix::Rotate(float degrees, glm::vec3 Axis) {
 }
 
 Matrix::Matrix(int WIDTH, int HEIGHT) {
-    projection = glm::perspective(glm::radians(45.0f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 0.1f, 100.0f);
+    projection = glm::perspective(glm::radians(45.0f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 0.1f, 200.0f);
 }

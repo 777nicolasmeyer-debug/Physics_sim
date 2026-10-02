@@ -19,6 +19,7 @@ struct SceneObject {
     glm::vec3 scale{1.0f};
     btRigidBody* body;
     GLuint textureID;
+    glm::vec4 baseColor;
 
     void draw(Shader& shader);
 };

@@ -12,6 +12,8 @@
 struct MeshData {
  std::vector<float> vertices;
  std::vector<unsigned int> indices;
+ unsigned int textureID = 0;
  int indexType;
+ glm::vec4 baseColor = glm::vec4(1.0f);
 };
 #endif //PHYSICS_SIM_MESHES_H

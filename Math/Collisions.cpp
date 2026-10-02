@@ -34,6 +34,7 @@ btRigidBody* Collisions::triangleShapeS(SceneObject& sceneObj, const MeshData& m
     btTransform transform;
     transform.setIdentity();
     transform.setOrigin(btVector3(sceneObj.position.x, sceneObj.position.y, sceneObj.position.z));
+    transform.setRotation(btQuaternion(sceneObj.rotation.x,sceneObj.rotation.y,sceneObj.rotation.z,sceneObj.rotation.w));
     btDefaultMotionState* motionState = new btDefaultMotionState(transform);
 
     btTriangleMesh* triMesh = new btTriangleMesh();

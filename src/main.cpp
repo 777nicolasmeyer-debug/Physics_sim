@@ -20,7 +20,7 @@ constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
 
 Shader shader;
-Loaders loader;
+
 Matrix matrix(WIDTH, HEIGHT);
 Camera camera;
 Gravity gravity;
@@ -33,11 +33,11 @@ std::vector<LightingObject> lights;
 static float speed = 5.0f;
 static float deltaTime = 0.0f;
 
-static void spawnLight();
-static void spawnObject1();
-static void terainInit();
+static void spawnLight(Loaders& loader);
+static void spawnObject1(Loaders& loader);
+static void terainInit(Loaders& loader);
 static void reset();
-static void handle_keyboardInput(GLFWwindow* window);
+static void handle_keyboardInput(GLFWwindow* window, Loaders& loader);
 static void mouse(GLFWwindow* window, double xpos, double ypos) {
     camera.mouseInput(xpos, ypos, deltaTime);
 }
@@ -67,6 +67,7 @@ int main() {
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+    Loaders loader;
 
     crateTex = loader.loadImageFromFile("../assets/crate.png");
     planeTex = loader.loadImageFromFile("../assets/plane.png");
@@ -79,7 +80,7 @@ int main() {
 
     shader.loadTexture("tex", 0);
 
-    terainInit();
+    terainInit(loader);
     glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
 
     auto lastFrame = static_cast<float>(glfwGetTime());
@@ -89,7 +90,7 @@ int main() {
         lastFrame = currentFrame;
         collisions.update(deltaTime);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        handle_keyboardInput(window);
+        handle_keyboardInput(window, loader);
 
         shader.use();
         shader.loadMatrix("projection", matrix.projection);
@@ -125,7 +126,7 @@ int main() {
             obj.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
 
             glm::quat orientation(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
-            obj.rotation = orientation;
+            //obj.rotation = orientation;
 
             auto model = glm::mat4(1.0f);
             model = glm::translate(model, obj.position);
@@ -147,7 +148,7 @@ int main() {
 
 static bool SpawnLightWasDown = false;
 static bool SpawnObjectWasDown = false;
-void handle_keyboardInput(GLFWwindow* window) {
+void handle_keyboardInput(GLFWwindow* window, Loaders& loader) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
         glfwSetWindowShouldClose(window, true);
     }
@@ -176,7 +177,7 @@ void handle_keyboardInput(GLFWwindow* window) {
     }
     if (glfwGetKey(window, GLFW_KEY_L)) {
         if (!SpawnLightWasDown) {
-            spawnLight();
+            spawnLight(loader);
             SpawnLightWasDown = true;
         }
     }
@@ -186,7 +187,7 @@ void handle_keyboardInput(GLFWwindow* window) {
 
     if (glfwGetKey(window, GLFW_KEY_2)) {
         if (!SpawnObjectWasDown) {
-            spawnObject1();
+            spawnObject1(loader);
             SpawnObjectWasDown = true;
         }
     }
@@ -195,23 +196,29 @@ void handle_keyboardInput(GLFWwindow* window) {
     }
 }
 
-void terainInit() {
+void terainInit(Loaders& loader) {
     tinygltf::Model model;
-    MeshData terrainData;
     loader.loadModelFromFile("../assets/WatchTower.glb", model);
-    terrainData = loader.extractMeshData(model, 0);
 
-    SceneObject obj;
-    obj.buffers.init(terrainData);
-    obj.position = glm::vec3(0.0f, 0.0f, 0.0f);
-    obj.rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
-    obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
-    obj.textureID = terrainTex;
-    collisions.triangleShapeS(obj, terrainData);
-    terrainObjects.push_back(obj);
+    for (size_t i = 0; i < model.meshes.size(); i++)
+    {
+        MeshData terrainData = loader.extractMeshData(model, i);
+
+        SceneObject obj;
+        obj.buffers.init(terrainData);
+        obj.position = glm::vec3(0.0f);
+        obj.rotation = glm::angleAxis(glm::radians(90.0f),glm::vec3(1.0f, 0.0f, 0.0f));
+        obj.scale = glm::vec3(1.0f);
+        obj.textureID = terrainData.textureID;
+        obj.baseColor = terrainData.baseColor;
+        std::cout << "TextureID: " << obj.textureID << std::endl;
+        collisions.triangleShapeS(obj, terrainData);
+
+        terrainObjects.push_back(obj);
+    }
 }
 
-void spawnLight() {
+void spawnLight(Loaders& loader) {
     tinygltf::Model model;
     MeshData lightData;
     loader.loadModelFromFile("../assets/Light.glb", model);
@@ -223,7 +230,7 @@ void spawnLight() {
     lights.push_back(obj);
 }
 
-void spawnObject1() {
+void spawnObject1(Loaders& loader) {
     tinygltf::Model Object;
     MeshData objectData;
     loader.loadModelFromFile("../assets/Object1.glb", Object);
@@ -232,9 +239,10 @@ void spawnObject1() {
     SceneObject obj;
     obj.buffers.init(objectData);
     obj.position = camera.getPosition();
-    obj.textureID = crateTex;
+    obj.textureID = objectData.textureID;
     obj.rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
     obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+    obj.baseColor = objectData.baseColor;
     collisions.convexShapeD(obj, objectData);
     sceneObjects.push_back(obj);
 

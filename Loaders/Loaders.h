@@ -11,15 +11,19 @@
 
 class Loaders {
 public:
+    Loaders();
     unsigned int loadImageFromFile(const char* path);
     unsigned int texture;
 
     void loadModelFromFile(const char* path, tinygltf::Model& model);
+    GLuint createTextureFromImage(const tinygltf::Image& image);
     bool PrimitiveCount = false;
 
     MeshData extractMeshData(const tinygltf::Model& model, int meshIndex);
 private:
     unsigned char* data;
+    GLuint createWhiteTexture();
+    GLuint whiteTexture;
 };
 
 #endif //PHYSICS_SIM_LOADERS_H
