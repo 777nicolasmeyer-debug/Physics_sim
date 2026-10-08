@@ -14,12 +14,13 @@
 #include <vector>
 
 #include "../Scene/SceneManager.h"
+#include <string>
 
 
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
 constexpr unsigned int SHADOW_MAP_SIZE = 1024;
-constexpr float SHADOW_FAR_PLANE = 100.0f;
+constexpr float SHADOW_FAR_PLANE = 200.0f;
 
 Shader shader;
 Shader shadowShader;
@@ -50,7 +51,6 @@ unsigned int planeTex;
 unsigned int terrainTex;
 
 static GLuint shadowFramebuffer = 0;
-static GLuint shadowCubemap = 0;
 
 static glm::mat4 makeModelMatrix(const SceneObject& obj) {
     glm::mat4 model(1.0f);
@@ -78,6 +78,11 @@ static bool initializeShadowMap() {
     if (shadowShader.ID == 0) return false;
 
     glGenFramebuffers(1, &shadowFramebuffer);
+    return shadowFramebuffer != 0;
+}
+
+static GLuint createShadowCubemap() {
+    GLuint shadowCubemap = 0;
     glGenTextures(1, &shadowCubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubemap);
     for (unsigned int face = 0; face < 6; ++face) {
@@ -97,13 +102,14 @@ static bool initializeShadowMap() {
     const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     if (!complete) {
-        std::cerr << "Failed to create point-light shadow framebuffer" << std::endl;
-        return false;
+        std::cerr << "Failed to create point-light shadow cubemap" << std::endl;
+        glDeleteTextures(1, &shadowCubemap);
+        return 0;
     }
-    return true;
+    return shadowCubemap;
 }
 
-static void renderShadowMap(const glm::vec3& lightPosition) {
+static void renderShadowMap(GLuint shadowCubemap, const glm::vec3& lightPosition) {
     constexpr glm::vec3 directions[] = {
         { 1.0f,  0.0f,  0.0f}, {-1.0f,  0.0f,  0.0f},
         { 0.0f,  1.0f,  0.0f}, { 0.0f, -1.0f,  0.0f},
@@ -127,6 +133,7 @@ static void renderShadowMap(const glm::vec3& lightPosition) {
     glUniform1f(glGetUniformLocation(shadowShader.ID, "farPlane"), SHADOW_FAR_PLANE);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubemap, 0);
     glClear(GL_DEPTH_BUFFER_BIT);
 
     for (const auto& obj : terrainObjects) {
@@ -191,37 +198,55 @@ int main() {
         lastFrame = currentFrame;
         collisions.update(deltaTime);
         updatePhysicsTransforms();
-        if (shadowMapReady && !lights.empty()) {
-            renderShadowMap(lights.front().position);
+        handle_keyboardInput(window, loader);
+        if (shadowMapReady) {
+            for (const auto& light : lights) {
+                if (light.shadowCubemap != 0) {
+                    renderShadowMap(light.shadowCubemap, light.position);
+                }
+            }
         }
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        handle_keyboardInput(window, loader);
 
         shader.use();
         shader.loadMatrix("projection", matrix.projection);
         shader.loadMatrix("view", camera.getViewMatrix());
         shader.loadVector3("viewPos", camera.getPosition());
         glUniform1f(glGetUniformLocation(shader.ID, "farPlane"), SHADOW_FAR_PLANE);
-        glUniform1i(glGetUniformLocation(shader.ID, "shadowsEnabled"),
-                    shadowMapReady && !lights.empty() ? 1 : 0);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubemap);
-
         if (lights.empty()) {
             shader.loadVector3("lightColor", glm::vec3(0.0f));
-        }
-        for (auto& light : lights) {
-            light.draw(shader);
-        }
-        if (!lights.empty()) {
-            shader.loadVector3("lightColor", lights.front().color);
-            shader.loadVector3("lightPos", lights.front().position);
-        }
-        for (auto& obj : sceneObjects) {
-            obj.draw(shader);
-        }
-        for (auto& obj : terrainObjects) {
-            obj.draw(shader);
+            shader.loadVector3("lightPos", glm::vec3(0.0f));
+            glUniform1i(glGetUniformLocation(shader.ID, "shadowsEnabled"), 0);
+            for (auto& obj : sceneObjects) obj.draw(shader);
+            for (auto& obj : terrainObjects) obj.draw(shader);
+        } else {
+            for (size_t i = 0; i < lights.size(); ++i) {
+                const auto& light = lights[i];
+                shader.loadVector3("lightColor", light.color);
+                shader.loadVector3("lightPos", light.position);
+                glUniform1i(glGetUniformLocation(shader.ID, "shadowsEnabled"),
+                            light.shadowCubemap != 0 ? 1 : 0);
+                glUniform1i(glGetUniformLocation(shader.ID, "ambientEnabled"), i == 0 ? 1 : 0);
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_CUBE_MAP, light.shadowCubemap);
+                if (i == 0) {
+                    glDisable(GL_BLEND);
+                } else {
+                    glEnable(GL_BLEND);
+                    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+                }
+                glDepthFunc(i == 0 ? GL_LESS : GL_LEQUAL);
+                glDepthMask(i == 0 ? GL_TRUE : GL_FALSE);
+
+                if (i == 0) {
+                    for (auto& marker : lights) marker.draw(shader);
+                }
+                for (auto& obj : sceneObjects) obj.draw(shader);
+                for (auto& obj : terrainObjects) obj.draw(shader);
+            }
+            glDepthMask(GL_TRUE);
+            glDepthFunc(GL_LESS);
+            glDisable(GL_BLEND);
         }
         glfwPollEvents();
         glfwSwapBuffers(window);
@@ -311,6 +336,9 @@ void spawnLight(Loaders& loader) {
     LightingObject obj;
     obj.buffers.init(lightData);
     obj.position = camera.getPosition();
+    if (shadowFramebuffer != 0) {
+        obj.shadowCubemap = createShadowCubemap();
+    }
     lights.push_back(obj);
 }
 
@@ -340,5 +368,10 @@ void spawnObject1(Loaders& loader) {
 
 void reset() {
     sceneObjects.clear();
+    for (auto& light : lights) {
+        if (light.shadowCubemap != 0) {
+            glDeleteTextures(1, &light.shadowCubemap);
+        }
+    }
     lights.clear();
 }

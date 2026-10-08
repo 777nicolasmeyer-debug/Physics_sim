@@ -28,6 +28,7 @@ struct LightingObject {
     VAO_VBO buffers;
     glm::vec3 position{0.0f};
     glm::vec3 color{1.0f, 1.0f, 1.0f};
+    GLuint shadowCubemap{0};
     btRigidBody* body;
 
     void draw(Shader& shader);
