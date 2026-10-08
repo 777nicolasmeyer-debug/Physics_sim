@@ -70,6 +70,67 @@ void Shader::createShaders(const char* vertex_path, const char* fragment_path) {
     glDeleteShader(fragment);
 }
 
+void Shader::createShaders(const char* vertex_path, const char* geometry_path, const char* fragment_path) {
+    auto compileShader = [](GLenum type, const char* path) {
+        std::string source;
+        std::ifstream file(path);
+        if (!file) {
+            std::cerr << "Failed to read shader file: " << path << std::endl;
+            return GLuint{0};
+        }
+        std::stringstream stream;
+        stream << file.rdbuf();
+        source = stream.str();
+
+        const char* sourceText = source.c_str();
+        GLuint shader = glCreateShader(type);
+        glShaderSource(shader, 1, &sourceText, nullptr);
+        glCompileShader(shader);
+
+        GLint success = GL_FALSE;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            char infoLog[512];
+            glGetShaderInfoLog(shader, sizeof(infoLog), nullptr, infoLog);
+            std::cerr << "Shader compilation failed (" << path << "): " << infoLog << std::endl;
+            glDeleteShader(shader);
+            return GLuint{0};
+        }
+        return shader;
+    };
+
+    const GLuint vertex = compileShader(GL_VERTEX_SHADER, vertex_path);
+    const GLuint geometry = compileShader(GL_GEOMETRY_SHADER, geometry_path);
+    const GLuint fragment = compileShader(GL_FRAGMENT_SHADER, fragment_path);
+    if (vertex == 0 || geometry == 0 || fragment == 0) {
+        if (vertex != 0) glDeleteShader(vertex);
+        if (geometry != 0) glDeleteShader(geometry);
+        if (fragment != 0) glDeleteShader(fragment);
+        ID = 0;
+        return;
+    }
+
+    ID = glCreateProgram();
+    glAttachShader(ID, vertex);
+    glAttachShader(ID, geometry);
+    glAttachShader(ID, fragment);
+    glLinkProgram(ID);
+
+    GLint success = GL_FALSE;
+    glGetProgramiv(ID, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(ID, sizeof(infoLog), nullptr, infoLog);
+        std::cerr << "Shadow shader program linking failed: " << infoLog << std::endl;
+        glDeleteProgram(ID);
+        ID = 0;
+    }
+
+    glDeleteShader(vertex);
+    glDeleteShader(geometry);
+    glDeleteShader(fragment);
+}
+
 void Shader::use() {
     glUseProgram(ID);
 }

@@ -18,8 +18,11 @@
 
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
+constexpr unsigned int SHADOW_MAP_SIZE = 1024;
+constexpr float SHADOW_FAR_PLANE = 100.0f;
 
 Shader shader;
+Shader shadowShader;
 
 Matrix matrix(WIDTH, HEIGHT);
 Camera camera;
@@ -45,6 +48,99 @@ static void mouse(GLFWwindow* window, double xpos, double ypos) {
 unsigned int crateTex;
 unsigned int planeTex;
 unsigned int terrainTex;
+
+static GLuint shadowFramebuffer = 0;
+static GLuint shadowCubemap = 0;
+
+static glm::mat4 makeModelMatrix(const SceneObject& obj) {
+    glm::mat4 model(1.0f);
+    model = glm::translate(model, obj.position);
+    model *= glm::mat4_cast(obj.rotation);
+    return glm::scale(model, obj.scale);
+}
+
+static void updatePhysicsTransforms() {
+    const auto update = [](SceneObject& obj) {
+        btTransform transform;
+        obj.body->getMotionState()->getWorldTransform(transform);
+        obj.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
+        const btQuaternion rotation = transform.getRotation();
+        obj.rotation = glm::quat(rotation.w(), rotation.x(), rotation.y(), rotation.z());
+    };
+    for (auto& obj : sceneObjects) update(obj);
+    for (auto& obj : terrainObjects) update(obj);
+}
+
+static bool initializeShadowMap() {
+    shadowShader.createShaders("../Shader/shadow_vertex.glsl",
+                               "../Shader/shadow_geometry.glsl",
+                               "../Shader/shadow_fragment.glsl");
+    if (shadowShader.ID == 0) return false;
+
+    glGenFramebuffers(1, &shadowFramebuffer);
+    glGenTextures(1, &shadowCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubemap);
+    for (unsigned int face = 0; face < 6; ++face) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_DEPTH_COMPONENT,
+                     SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubemap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (!complete) {
+        std::cerr << "Failed to create point-light shadow framebuffer" << std::endl;
+        return false;
+    }
+    return true;
+}
+
+static void renderShadowMap(const glm::vec3& lightPosition) {
+    constexpr glm::vec3 directions[] = {
+        { 1.0f,  0.0f,  0.0f}, {-1.0f,  0.0f,  0.0f},
+        { 0.0f,  1.0f,  0.0f}, { 0.0f, -1.0f,  0.0f},
+        { 0.0f,  0.0f,  1.0f}, { 0.0f,  0.0f, -1.0f}
+    };
+    constexpr glm::vec3 ups[] = {
+        {0.0f, -1.0f,  0.0f}, {0.0f, -1.0f,  0.0f},
+        {0.0f,  0.0f,  1.0f}, {0.0f,  0.0f, -1.0f},
+        {0.0f, -1.0f,  0.0f}, {0.0f, -1.0f,  0.0f}
+    };
+    const glm::mat4 projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, SHADOW_FAR_PLANE);
+    glm::mat4 shadowMatrices[6];
+    for (int face = 0; face < 6; ++face) {
+        shadowMatrices[face] = projection * glm::lookAt(lightPosition, lightPosition + directions[face], ups[face]);
+    }
+
+    shadowShader.use();
+    glUniformMatrix4fv(glGetUniformLocation(shadowShader.ID, "shadowMatrices[0]"), 6, GL_FALSE,
+                       glm::value_ptr(shadowMatrices[0]));
+    shadowShader.loadVector3("lightPos", lightPosition);
+    glUniform1f(glGetUniformLocation(shadowShader.ID, "farPlane"), SHADOW_FAR_PLANE);
+    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    for (const auto& obj : terrainObjects) {
+        shadowShader.loadMatrix("model", makeModelMatrix(obj));
+        obj.buffers.draw();
+    }
+    for (const auto& obj : sceneObjects) {
+        shadowShader.loadMatrix("model", makeModelMatrix(obj));
+        obj.buffers.draw();
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, WIDTH, HEIGHT);
+}
 int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -79,6 +175,11 @@ int main() {
     shader.use();
 
     shader.loadTexture("tex", 0);
+    const bool shadowMapReady = initializeShadowMap();
+    if (!shadowMapReady) {
+        std::cerr << "Point-light shadows are disabled" << std::endl;
+    }
+    shader.loadTexture("shadowCube", 1);
 
     terainInit(loader);
     glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
@@ -89,54 +190,37 @@ int main() {
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         collisions.update(deltaTime);
+        updatePhysicsTransforms();
+        if (shadowMapReady && !lights.empty()) {
+            renderShadowMap(lights.front().position);
+        }
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         handle_keyboardInput(window, loader);
 
         shader.use();
         shader.loadMatrix("projection", matrix.projection);
         shader.loadMatrix("view", camera.getViewMatrix());
+        shader.loadVector3("viewPos", camera.getPosition());
+        glUniform1f(glGetUniformLocation(shader.ID, "farPlane"), SHADOW_FAR_PLANE);
+        glUniform1i(glGetUniformLocation(shader.ID, "shadowsEnabled"),
+                    shadowMapReady && !lights.empty() ? 1 : 0);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubemap);
 
+        if (lights.empty()) {
+            shader.loadVector3("lightColor", glm::vec3(0.0f));
+        }
         for (auto& light : lights) {
             light.draw(shader);
         }
+        if (!lights.empty()) {
+            shader.loadVector3("lightColor", lights.front().color);
+            shader.loadVector3("lightPos", lights.front().position);
+        }
         for (auto& obj : sceneObjects) {
-            btTransform transform;
-
-            obj.body -> getMotionState()->getWorldTransform(transform);
-            obj.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
-
-            glm::quat orientation(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
-            obj.rotation = orientation;
-
-            auto model = glm::mat4(1.0f);
-            model = glm::translate(model, obj.position);
-            model *= glm::mat4_cast(obj.rotation);
-            model = glm::scale(model, obj.scale);
-
-            shader.loadMatrix("model", model);
-            obj.draw(shader);
-
-            shader.loadMatrix("model", model);
             obj.draw(shader);
         }
         for (auto& obj : terrainObjects) {
-            btTransform transform;
-
-            obj.body -> getMotionState()->getWorldTransform(transform);
-            obj.position = glm::vec3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z());
-
-            glm::quat orientation(transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z());
-            //obj.rotation = orientation;
-
-            auto model = glm::mat4(1.0f);
-            model = glm::translate(model, obj.position);
-            model *= glm::mat4_cast(obj.rotation);
-            model = glm::scale(model, obj.scale);
-
-            shader.loadMatrix("model", model);
-            obj.draw(shader);
-
-            shader.loadMatrix("model", model);
             obj.draw(shader);
         }
         glfwPollEvents();
@@ -240,7 +324,7 @@ void spawnObject1(Loaders& loader) {
     obj.buffers.init(objectData);
     obj.position = camera.getPosition();
     obj.textureID = objectData.textureID;
-    obj.rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
+    obj.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     obj.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     obj.baseColor = objectData.baseColor;
     collisions.convexShapeD(obj, objectData);

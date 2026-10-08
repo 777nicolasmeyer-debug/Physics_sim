@@ -14,6 +14,7 @@ public:
     GLuint ID;
 
     void createShaders(const char* vertex_path, const char* fragment_path);
+    void createShaders(const char* vertex_path, const char* geometry_path, const char* fragment_path);
     void use();
     void loadMatrix(const char * name, const glm::mat4 & matrix);
     void loadVector3(const char * name, const glm::vec3 & vector);
