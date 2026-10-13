@@ -14,6 +14,7 @@ struct ApplicationState {
     bool spawnObjectWasDown = false;
     bool spawnCarWasDown = false;
     bool resetWasDown = false;
+    bool playerWasDown = false;
 };
 
 void mouseCallback(GLFWwindow* window, const double xpos, const double ypos) {
@@ -80,6 +81,12 @@ int main() {
                 const float currentFrame = static_cast<float>(glfwGetTime());
                 const float deltaTime = currentFrame - lastFrame;
                 lastFrame = currentFrame;
+
+                const bool playerDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
+                if (playerDown && !app.playerWasDown) {
+                    engine.togglePlayer();
+                }
+                app.playerWasDown = playerDown;
 
                 engine.handleKeyboardInput(readCameraInput(window), deltaTime);
 

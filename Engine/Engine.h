@@ -16,6 +16,17 @@
 #include "../Scene/SceneManager.h"
 #include "../Shader/Shader.h"
 
+struct Player {
+    glm::vec3 position{0.0f};
+    glm::vec3 front{0.0f};
+    float speed{5.0f};
+    float jumpStrength{5.0f};
+    btRigidBody* body = nullptr;
+
+    void move(const glm::vec3& direction);
+    void jump();
+};
+
 class Engine {
 public:
     struct CameraInput {
@@ -40,6 +51,7 @@ public:
 
     void handleKeyboardInput(const CameraInput& input, float deltaTime);
     void handleMouseInput(double xpos, double ypos);
+    void togglePlayer();
 
     void addStaticObject(const MeshData& mesh, const glm::vec3& position,
                          const glm::quat& rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
@@ -64,6 +76,7 @@ public:
     void clearLights();
     glm::vec3 getCameraPosition() const;
     glm::vec3 getCameraForward() const;
+    bool playerExists = false;
 
 private:
     static constexpr unsigned int SHADOW_MAP_SIZE = 1024;
@@ -83,6 +96,9 @@ private:
     std::vector<SceneObject> sceneObjects;
     std::vector<SceneObject> terrainObjects;
     std::vector<LightingObject> lights;
+    Player player;
+    SceneObject playerObject;
+    bool playerJumpWasDown = false;
 
     bool initializeShadowMap();
     GLuint createShadowCubemap();
@@ -91,5 +107,7 @@ private:
                          int width, int height);
     void updatePhysicsTransforms();
 };
+
+
 
 #endif

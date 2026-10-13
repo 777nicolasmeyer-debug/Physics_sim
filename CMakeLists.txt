@@ -14,7 +14,7 @@ find_path(TINYGLTF_INCLUDE_DIR tiny_gltf.h
 
 add_executable(Physics_sim
         src/main.cpp
-        src/engine.cpp
+        Engine/engine.cpp
         Meshes/Meshes.cpp
         Rendering/VAO_VBO.cpp
         Shader/Shader.cpp

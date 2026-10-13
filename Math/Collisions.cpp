@@ -80,6 +80,32 @@ void Collisions::removeRigidBody(btRigidBody* body) {
     delete body;
 }
 
+bool Collisions::isGrounded(const btRigidBody* body) const {
+    if (dynamicsWorld == nullptr || body == nullptr) {
+        return false;
+    }
+
+    const int manifoldCount = dynamicsWorld->getDispatcher()->getNumManifolds();
+    for (int i = 0; i < manifoldCount; ++i) {
+        const btPersistentManifold* manifold = dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
+        const bool isBody0 = manifold->getBody0() == body;
+        if (!isBody0 && manifold->getBody1() != body) {
+            continue;
+        }
+
+        for (int j = 0; j < manifold->getNumContacts(); ++j) {
+            const btManifoldPoint& contact = manifold->getContactPoint(j);
+            const btScalar normalY = isBody0
+                ? contact.m_normalWorldOnB.y()
+                : -contact.m_normalWorldOnB.y();
+            if (contact.getDistance() <= btScalar(0.05) && normalY > btScalar(0.5)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 btRigidBody* Collisions::convexShapeD(SceneObject& sceneObj, const MeshData& mesh,
                                      const glm::vec3& scale) {
 

@@ -1,4 +1,4 @@
-#include "../Engine/Engine.h"
+#include "Engine.h"
 
 #include <iostream>
 #include <functional>
@@ -73,11 +73,45 @@ void applyNodeTransform(MeshData& mesh, const glm::mat4& transform) {
     }
 }
 
+MeshData makePlayerMesh() {
+    constexpr float vertices[] = {
+        // position             normal             uv
+        -0.5f,-0.5f, 0.5f,  0,0,1,  0,0,  0.5f,-0.5f, 0.5f,  0,0,1,  1,0,
+         0.5f, 0.5f, 0.5f,  0,0,1,  1,1, -0.5f, 0.5f, 0.5f,  0,0,1,  0,1,
+         0.5f,-0.5f,-0.5f,  0,0,-1, 0,0, -0.5f,-0.5f,-0.5f,  0,0,-1, 1,0,
+        -0.5f, 0.5f,-0.5f,  0,0,-1, 1,1,  0.5f, 0.5f,-0.5f,  0,0,-1, 0,1,
+        -0.5f,-0.5f,-0.5f, -1,0,0,  0,0, -0.5f,-0.5f, 0.5f, -1,0,0, 1,0,
+        -0.5f, 0.5f, 0.5f, -1,0,0,  1,1, -0.5f, 0.5f,-0.5f, -1,0,0, 0,1,
+         0.5f,-0.5f, 0.5f,  1,0,0,  0,0,  0.5f,-0.5f,-0.5f,  1,0,0, 1,0,
+         0.5f, 0.5f,-0.5f,  1,0,0,  1,1,  0.5f, 0.5f, 0.5f,  1,0,0, 0,1,
+        -0.5f, 0.5f, 0.5f,  0,1,0,  0,0,  0.5f, 0.5f, 0.5f,  0,1,0, 1,0,
+         0.5f, 0.5f,-0.5f,  0,1,0,  1,1, -0.5f, 0.5f,-0.5f,  0,1,0, 0,1,
+        -0.5f,-0.5f,-0.5f,  0,-1,0, 0,0,  0.5f,-0.5f,-0.5f,  0,-1,0, 1,0,
+         0.5f,-0.5f, 0.5f,  0,-1,0, 1,1, -0.5f,-0.5f, 0.5f,  0,-1,0, 0,1
+    };
+    constexpr unsigned int indices[] = {
+         0, 1, 2, 2, 3, 0,   4, 5, 6, 6, 7, 4,
+         8, 9,10,10,11, 8,  12,13,14,14,15,12,
+        16,17,18,18,19,16,  20,21,22,22,23,20
+    };
+    MeshData mesh;
+    mesh.vertices.assign(std::begin(vertices), std::end(vertices));
+    mesh.indices.assign(std::begin(indices), std::end(indices));
+    mesh.indexType = GL_UNSIGNED_INT;
+    mesh.baseColor = glm::vec4(0.9f, 0.25f, 0.15f, 1.0f);
+    return mesh;
+}
+
 }
 
 Engine::~Engine() {
     if (!initialized) {
         return;
+    }
+    if (playerExists) {
+        collisions.removeRigidBody(player.body);
+        player.body = nullptr;
+        playerExists = false;
     }
     clearDynamicObjects();
     for (const auto& light : lights) {
@@ -110,6 +144,9 @@ bool Engine::initialize() {
         std::cerr << "Point-light shadows are disabled" << std::endl;
     }
     shader.loadTexture("shadowCube", 1);
+    playerObject.buffers.init(makePlayerMesh());
+    playerObject.scale = glm::vec3(0.7f, 1.8f, 0.7f);
+    playerObject.baseColor = glm::vec4(0.9f, 0.25f, 0.15f, 1.0f);
     initialized = true;
     return true;
 }
@@ -120,6 +157,9 @@ void Engine::update(float deltaTime) {
     }
     collisions.update(deltaTime);
     updatePhysicsTransforms();
+    if (playerExists) {
+        camera.setPosition(player.position + glm::vec3(0.0f, 0.7f, 0.0f));
+    }
 }
 
 void Engine::render(const int width, const int height) {
@@ -151,6 +191,7 @@ void Engine::render(const int width, const int height) {
         glUniform1i(glGetUniformLocation(shader.ID, "shadowsEnabled"), 0);
         for (auto& object : sceneObjects) object.draw(shader);
         for (auto& object : terrainObjects) object.draw(shader);
+        if (playerExists) playerObject.draw(shader);
         return;
     }
 
@@ -177,6 +218,7 @@ void Engine::render(const int width, const int height) {
         }
         for (auto& object : sceneObjects) object.draw(shader);
         for (auto& object : terrainObjects) object.draw(shader);
+        if (playerExists) playerObject.draw(shader);
     }
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
@@ -184,16 +226,63 @@ void Engine::render(const int width, const int height) {
 }
 
 void Engine::handleKeyboardInput(const CameraInput& input, const float deltaTime) {
-    if (input.forward) camera.moveForward(cameraSpeed, deltaTime);
-    if (input.backward) camera.moveBackward(cameraSpeed, deltaTime);
-    if (input.left) camera.moveLeft(cameraSpeed, deltaTime);
-    if (input.right) camera.moveRight(cameraSpeed, deltaTime);
-    if (input.up) camera.moveUp(cameraSpeed, deltaTime);
-    if (input.down) camera.moveDown(cameraSpeed, deltaTime);
+    if (!playerExists) {
+        if (input.forward) camera.moveForward(cameraSpeed, deltaTime);
+        if (input.backward) camera.moveBackward(cameraSpeed, deltaTime);
+        if (input.left) camera.moveLeft(cameraSpeed, deltaTime);
+        if (input.right) camera.moveRight(cameraSpeed, deltaTime);
+        if (input.up) camera.moveUp(cameraSpeed, deltaTime);
+        if (input.down) camera.moveDown(cameraSpeed, deltaTime);
+    }
+    else {
+        player.front = camera.getFront();
+        glm::vec3 forward = player.front;
+        forward.y = 0.0f;
+        if (glm::dot(forward, forward) > 0.0f) {
+            forward = glm::normalize(forward);
+        }
+        const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+        glm::vec3 direction(0.0f);
+        if (input.forward) direction += forward;
+        if (input.backward) direction -= forward;
+        if (input.right) direction += right;
+        if (input.left) direction -= right;
+        player.move(direction);
+
+        if (input.up && !playerJumpWasDown && collisions.isGrounded(player.body)) {
+            player.jump();
+        }
+        playerJumpWasDown = input.up;
+    }
 }
 
 void Engine::handleMouseInput(const double xpos, const double ypos) {
     camera.mouseInput(xpos, ypos);
+}
+
+void Engine::togglePlayer() {
+    if (playerExists) {
+        collisions.removeRigidBody(player.body);
+        player.body = nullptr;
+        playerObject.body = nullptr;
+        playerExists = false;
+        playerJumpWasDown = false;
+        return;
+    }
+
+    const MeshData mesh = makePlayerMesh();
+    player.position = camera.getPosition() - glm::vec3(0.0f, 0.7f, 0.0f);
+    player.front = camera.getFront();
+    playerObject.position = player.position;
+    playerObject.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    player.body = collisions.boxShapeD(playerObject, mesh, playerObject.scale);
+    if (player.body == nullptr) {
+        std::cerr << "Failed to spawn player body" << std::endl;
+        return;
+    }
+    player.body->setAngularFactor(btVector3(0.0f, 0.0f, 0.0f));
+    player.body->setRestitution(0.0f);
+    playerExists = true;
 }
 
 void Engine::addStaticObject(const MeshData& mesh, const glm::vec3& position,
@@ -507,6 +596,10 @@ void Engine::renderShadowMap(const GLuint shadowCubemap, const glm::vec3& lightP
         shadowShader.loadMatrix("model", makeModelMatrix(object));
         object.buffers.draw();
     }
+    if (playerExists) {
+        shadowShader.loadMatrix("model", makeModelMatrix(playerObject));
+        playerObject.buffers.draw();
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, width, height);
@@ -526,4 +619,30 @@ void Engine::updatePhysicsTransforms() {
     };
     for (auto& object : sceneObjects) update(object);
     for (auto& object : terrainObjects) update(object);
+    if (playerExists) {
+        update(playerObject);
+        player.position = playerObject.position;
+    }
+}
+
+void Player::move(const glm::vec3& direction) {
+    if (body == nullptr) {
+        return;
+    }
+    glm::vec3 horizontalDirection(direction.x, 0.0f, direction.z);
+    if (glm::dot(horizontalDirection, horizontalDirection) > 1.0f) {
+        horizontalDirection = glm::normalize(horizontalDirection);
+    }
+    const btVector3 velocity = body->getLinearVelocity();
+    body->setLinearVelocity(btVector3(horizontalDirection.x * speed, velocity.y(),
+                                       horizontalDirection.z * speed));
+}
+
+void Player::jump() {
+    if (body == nullptr) {
+        return;
+    }
+    const btVector3 velocity = body->getLinearVelocity();
+    body->setLinearVelocity(btVector3(velocity.x(), jumpStrength, velocity.z()));
+    body->activate(true);
 }

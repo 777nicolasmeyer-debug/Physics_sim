@@ -60,6 +60,10 @@ void Camera::mouseInput(const double x, const double y) {
     calculateVectors();
 }
 
+void Camera::setPosition(const glm::vec3 position) {
+    cameraPos = position;
+}
+
 void Camera::calculateVectors() {
     cameraDirection.x = std::cos(glm::radians(yaw)) * std::cos(glm::radians(pitch));
     cameraDirection.y = std::sin(glm::radians(pitch));
