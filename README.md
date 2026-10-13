@@ -15,5 +15,14 @@ so it can use GLFW, Qt, or an ImGui host:
 5. Draw the GUI after `render`, then let the host swap/present its buffers.
 
 `src/main.cpp` is the GLFW example host and contains the sample game's asset setup
-and spawn-key bindings. A Qt host can use the same engine calls from its
+and spawn-key bindings.
+
+`WASD` movement
+
+`1 - 9` used to load models into world
+`P` to toggle Player
+
+`L` to spawn lights
+
+A Qt host can use the same engine calls from its
 `QOpenGLWidget` lifecycle without adopting the sample application's GLFW loop.
