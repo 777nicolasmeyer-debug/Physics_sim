@@ -20,7 +20,7 @@ struct Player {
     glm::vec3 position{0.0f};
     glm::vec3 front{0.0f};
     float speed{5.0f};
-    float jumpStrength{5.0f};
+    float jumpStrength{10.0f};
     btRigidBody* body = nullptr;
 
     void move(const glm::vec3& direction);

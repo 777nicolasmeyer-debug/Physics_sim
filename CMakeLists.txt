@@ -20,7 +20,6 @@ add_executable(Physics_sim
         Shader/Shader.cpp
         Loaders/Loaders.cpp
         Math/matrix.cpp
-        Math/gravity.cpp
         Camera/camera.cpp
         Math/Collisions.cpp
         src/loaders_implementation.cpp

@@ -6,7 +6,6 @@
 #include <bullet/btBulletDynamicsCommon.h>
 #include <limits>
 
-// Keep these static so they live across calls
 static btBroadphaseInterface* broadphase;
 static btDefaultCollisionConfiguration* collisionConfiguration;
 static btCollisionDispatcher* dispatcher;
