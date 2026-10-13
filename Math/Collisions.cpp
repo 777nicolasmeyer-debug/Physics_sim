@@ -4,6 +4,7 @@
 
 #include "Collisions.h"
 #include <bullet/btBulletDynamicsCommon.h>
+#include <limits>
 
 // Keep these static so they live across calls
 static btBroadphaseInterface* broadphase;
@@ -69,16 +70,30 @@ void Collisions::update(float dt) {
     }
 }
 
-btRigidBody* Collisions::convexShapeD(SceneObject& sceneObj, const MeshData& mesh) {
+void Collisions::removeRigidBody(btRigidBody* body) {
+    if (dynamicsWorld == nullptr || body == nullptr) {
+        return;
+    }
+    dynamicsWorld->removeRigidBody(body);
+    delete body->getCollisionShape();
+    delete body->getMotionState();
+    delete body;
+}
+
+btRigidBody* Collisions::convexShapeD(SceneObject& sceneObj, const MeshData& mesh,
+                                     const glm::vec3& scale) {
 
     btTransform transform;
     transform.setIdentity();
     transform.setOrigin(btVector3(sceneObj.position.x, sceneObj.position.y, sceneObj.position.z));
+    transform.setRotation(btQuaternion(sceneObj.rotation.x, sceneObj.rotation.y,
+                                       sceneObj.rotation.z, sceneObj.rotation.w));
     btDefaultMotionState* motionState = new btDefaultMotionState(transform);
 
     btConvexHullShape* hull = new btConvexHullShape();
     for (size_t i = 0; i < mesh.vertices.size(); i += 8) {
-        btVector3 point(mesh.vertices[i], mesh.vertices[i + 1], mesh.vertices[i + 2]);
+        btVector3 point(mesh.vertices[i] * scale.x, mesh.vertices[i + 1] * scale.y,
+                        mesh.vertices[i + 2] * scale.z);
         hull->addPoint(point);
     }
     hull->initializePolyhedralFeatures();
@@ -96,5 +111,46 @@ btRigidBody* Collisions::convexShapeD(SceneObject& sceneObj, const MeshData& mes
     if (mesh.vertices.size() % 8 != 0) {
         std::cerr << "Vertex array misaligned!" << std::endl;
     }
+    return sceneObj.body;
+}
+
+btRigidBody* Collisions::boxShapeD(SceneObject& sceneObj, const MeshData& mesh,
+                                   const glm::vec3& scale) {
+    if (mesh.vertices.empty()) {
+        return nullptr;
+    }
+
+    glm::vec3 minimum(std::numeric_limits<float>::max());
+    glm::vec3 maximum(std::numeric_limits<float>::lowest());
+    for (size_t i = 0; i + 2 < mesh.vertices.size(); i += 8) {
+        const glm::vec3 point(mesh.vertices[i] * scale.x,
+                              mesh.vertices[i + 1] * scale.y,
+                              mesh.vertices[i + 2] * scale.z);
+        minimum = glm::min(minimum, point);
+        maximum = glm::max(maximum, point);
+    }
+
+    const glm::vec3 halfExtents = (maximum - minimum) * 0.5f;
+    if (halfExtents.x <= 0.0f || halfExtents.y <= 0.0f || halfExtents.z <= 0.0f) {
+        std::cerr << "Cannot create car collision box from degenerate mesh bounds" << std::endl;
+        return nullptr;
+    }
+
+    auto* shape = new btBoxShape(btVector3(halfExtents.x, halfExtents.y, halfExtents.z));
+    btTransform transform;
+    transform.setIdentity();
+    transform.setOrigin(btVector3(sceneObj.position.x, sceneObj.position.y, sceneObj.position.z));
+    transform.setRotation(btQuaternion(sceneObj.rotation.x, sceneObj.rotation.y,
+                                       sceneObj.rotation.z, sceneObj.rotation.w));
+
+    btVector3 inertia(0.0f, 0.0f, 0.0f);
+    constexpr btScalar mass = 20.0f;
+    shape->calculateLocalInertia(mass, inertia);
+    auto* motionState = new btDefaultMotionState(transform);
+    btRigidBody::btRigidBodyConstructionInfo info(mass, motionState, shape, inertia);
+    sceneObj.body = new btRigidBody(info);
+    sceneObj.body->setFriction(5.0f);
+    sceneObj.body->setRestitution(0.0f);
+    dynamicsWorld->addRigidBody(sceneObj.body);
     return sceneObj.body;
 }

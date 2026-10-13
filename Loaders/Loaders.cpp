@@ -88,7 +88,7 @@ GLuint Loaders::createTextureFromImage(const tinygltf::Image& image) {
 
 GLuint Loaders::createWhiteTexture()
 {
-    GLuint tex;
+    GLuint tex = 0;
 
     unsigned char whitePixel[] = {
         255, 255, 255, 255
@@ -104,7 +104,9 @@ GLuint Loaders::createWhiteTexture()
     return tex;
 }
 
-Loaders::Loaders() {
+Loaders::Loaders() = default;
+
+void Loaders::initialize() {
     whiteTexture = createWhiteTexture();
 }
 
@@ -115,6 +117,7 @@ MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
     const tinygltf::Mesh& mesh = model.meshes[meshIndex];
 
     for (const auto& primitive : mesh.primitives) {
+        const unsigned int baseVertex = static_cast<unsigned int>(data.vertices.size() / 8);
         if (primitive.material >= 0) {
             const auto& material = model.materials[primitive.material];
 
@@ -240,7 +243,7 @@ MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
 
 
             // Sequential index into new vertex array
-            data.indices.push_back(static_cast<unsigned int>(i));
+            data.indices.push_back(baseVertex + static_cast<unsigned int>(i));
         }
 
         data.indexType = GL_UNSIGNED_INT; // we generate sequential unsigned int indices
@@ -259,6 +262,3 @@ MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
 
     return data;
 }
-
-
-

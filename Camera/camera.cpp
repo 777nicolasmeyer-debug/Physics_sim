@@ -37,26 +37,26 @@ void Camera::moveDown(const float speed, const float deltaTime) {
     calculateVectors();
 }
 
-void Camera::mouseInput(double x, double y, const float deltaTime) {
-    const float sensitivity = 100.0f;
-    float Xoffset = static_cast<float>(x) - lastX;
-    float Yoffset = static_cast<float>(y) - lastY;
+void Camera::mouseInput(const double x, const double y) {
+    if (firstMove) {
+        lastX = static_cast<float>(x);
+        lastY = static_cast<float>(y);
+        firstMove = false;
+        return;
+    }
+
+    constexpr float sensitivity = 0.1f;
+    const float Xoffset = static_cast<float>(x) - lastX;
+    const float Yoffset = static_cast<float>(y) - lastY;
     lastX = static_cast<float>(x);
     lastY = static_cast<float>(y);
 
-    Xoffset *= sensitivity;
-    Yoffset *= sensitivity;
-
-    yaw += Xoffset * deltaTime;
-    pitch -= Yoffset * deltaTime;
+    yaw += Xoffset * sensitivity;
+    pitch -= Yoffset * sensitivity;
 
     if (pitch > 89.0f) pitch = 89.0f;
     if (pitch < -89.0f) pitch = -89.0f;
 
-    if (firstMove) {
-        lastX = static_cast<float>(x);
-        lastY = static_cast<float>(y);
-    }
     calculateVectors();
 }
 
@@ -72,6 +72,10 @@ void Camera::calculateVectors() {
 
 glm::vec3 Camera::getPosition() const {
     return cameraPos;
+}
+
+glm::vec3 Camera::getFront() const {
+    return cameraFront;
 }
 
 glm::mat4 Camera::getViewMatrix() const {

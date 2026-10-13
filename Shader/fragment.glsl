@@ -15,6 +15,14 @@ uniform float farPlane;
 uniform int shadowsEnabled;
 uniform int ambientEnabled;
 
+const vec3 shadowSampleDirections[20] = vec3[](
+    vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
+    vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+    vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+    vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+    vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0,  1, -1), vec3( 0, -1, -1)
+);
+
 void main() {
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(lightPos - Pos);
@@ -26,10 +34,15 @@ void main() {
     float shadow = 0.0;
     if (shadowsEnabled != 0) {
         vec3 fragToLight = Pos - lightPos;
-        float closestDepth = texture(shadowCube, fragToLight).r * farPlane;
         float currentDepth = length(fragToLight);
-        float bias = max(0.15 * (1.0 - dot(norm, lightDir)), 0.05);
-        shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+        float bias = max(0.5 * (1.0 - dot(norm, lightDir)), 0.15);
+        float diskRadius = 0.01 * (1.0 + currentDepth / farPlane);
+        for (int i = 0; i < shadowSampleDirections.length(); ++i) {
+            float closestDepth =
+                texture(shadowCube, fragToLight + shadowSampleDirections[i] * diskRadius).r * farPlane;
+            shadow += currentDepth - bias > closestDepth ? 1.0 : 0.0;
+        }
+        shadow /= float(shadowSampleDirections.length());
     }
 
     vec3 ambient = ambientEnabled != 0 ? 0.1 * lightColor : vec3(0.0);

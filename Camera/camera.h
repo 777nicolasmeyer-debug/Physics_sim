@@ -5,9 +5,8 @@
 #ifndef PHYSICS_SIM_CAMERA_H
 #define PHYSICS_SIM_CAMERA_H
 
-#include "glad/glad.h"
-#include "GLFW/glfw3.h"
-#include "glm/gtc/type_ptr.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 
 class Camera {
@@ -22,8 +21,9 @@ public:
     void moveDown(float speed, float deltaTime);
 
     void calculateVectors();
-    void mouseInput( double x, double y, float deltaTime);
+    void mouseInput(double x, double y);
     glm::vec3 getPosition() const;
+    glm::vec3 getFront() const;
     glm::mat4 getViewMatrix() const;
 private:
     bool firstMove = true;

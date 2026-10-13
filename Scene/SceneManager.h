@@ -11,25 +11,26 @@
 #include <glm/glm.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <vector>
 
 struct SceneObject {
     VAO_VBO buffers;
     glm::vec3 position{0.0f};
-    glm::quat rotation;
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 scale{1.0f};
-    btRigidBody* body;
-    GLuint textureID;
-    glm::vec4 baseColor;
+    btRigidBody* body = nullptr;
+    GLuint textureID = 0;
+    glm::vec4 baseColor{1.0f};
 
     void draw(Shader& shader);
 };
 
 struct LightingObject {
-    VAO_VBO buffers;
+    std::vector<VAO_VBO> buffers;
     glm::vec3 position{0.0f};
     glm::vec3 color{1.0f, 1.0f, 1.0f};
     GLuint shadowCubemap{0};
-    btRigidBody* body;
+    btRigidBody* body = nullptr;
 
     void draw(Shader& shader);
 };

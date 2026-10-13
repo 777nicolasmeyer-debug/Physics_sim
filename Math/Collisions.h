@@ -14,7 +14,11 @@ class Collisions {
 public:
     void init();
     void update(float dt);
-    btRigidBody* convexShapeD(SceneObject& sceneObj, const MeshData& mesh);
+    void removeRigidBody(btRigidBody* body);
+    btRigidBody* convexShapeD(SceneObject& sceneObj, const MeshData& mesh,
+                              const glm::vec3& scale = glm::vec3(1.0f));
+    btRigidBody* boxShapeD(SceneObject& sceneObj, const MeshData& mesh,
+                           const glm::vec3& scale = glm::vec3(1.0f));
     btRigidBody* triangleShapeS(SceneObject& sceneObj, const MeshData& mesh);
 };
 

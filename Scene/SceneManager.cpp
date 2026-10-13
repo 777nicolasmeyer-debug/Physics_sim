@@ -24,5 +24,7 @@ void LightingObject::draw(Shader& shader) {
     model = glm::translate(model, position);
 
     shader.loadMatrix("model", model);
-    buffers.draw();
+    for (const auto& buffer : buffers) {
+        buffer.draw();
+    }
 }

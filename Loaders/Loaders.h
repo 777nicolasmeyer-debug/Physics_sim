@@ -12,6 +12,7 @@
 class Loaders {
 public:
     Loaders();
+    void initialize();
     unsigned int loadImageFromFile(const char* path);
     unsigned int texture;
 
@@ -23,7 +24,7 @@ public:
 private:
     unsigned char* data;
     GLuint createWhiteTexture();
-    GLuint whiteTexture;
+    GLuint whiteTexture = 0;
 };
 
 #endif //PHYSICS_SIM_LOADERS_H
