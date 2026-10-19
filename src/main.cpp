@@ -72,8 +72,11 @@ int main() {
 
         if (!engine.initialize()) {
             result = 1;
-        } else {
-            engine.addStaticModel("../assets/SpaceStation_Color.glb", glm::vec3(0.0f));
+        }
+        else {
+            engine.addStaticModel("../assets/F1_track2.glb", glm::vec3(0.0f));
+            engine.addLight("../assets/Light.glb", glm::vec3(900.0f, 1500.0f, 650.0f),
+                            glm::vec3(1.0f), false, true);
 
             glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
             float lastFrame = static_cast<float>(glfwGetTime());

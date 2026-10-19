@@ -14,16 +14,20 @@ find_path(TINYGLTF_INCLUDE_DIR tiny_gltf.h
 
 add_executable(Physics_sim
         src/main.cpp
+        Engine/loaders_implementation.cpp
         Engine/engine.cpp
-        Meshes/Meshes.cpp
-        Rendering/VAO_VBO.cpp
-        Shader/Shader.cpp
-        Loaders/Loaders.cpp
-        Math/matrix.cpp
-        Camera/camera.cpp
-        Math/Collisions.cpp
-        src/loaders_implementation.cpp
-        Scene/SceneManager.cpp
+        Engine/engine_assets.cpp
+        Engine/engine_player.cpp
+        Engine/engine_scene.cpp
+        Engine/engine_shadows.cpp
+        Engine/Meshes/Meshes.cpp
+        Engine/Rendering/VAO_VBO.cpp
+        Engine/Shader/Shader.cpp
+        Engine/Loaders/Loaders.cpp
+        Engine/Math/matrix.cpp
+        Engine/Camera/camera.cpp
+        Engine/Math/Collisions.cpp
+        Engine/Scene/SceneManager.cpp
 )
 
 target_link_libraries(Physics_sim PRIVATE
@@ -37,4 +41,5 @@ target_link_libraries(Physics_sim PRIVATE
 target_include_directories(Physics_sim PRIVATE
     ${Stb_INCLUDE_DIR}
         ${TINYGLTF_INCLUDE_DIR}
+        Engine
 )

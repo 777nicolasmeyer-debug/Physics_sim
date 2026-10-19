@@ -9,22 +9,20 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "../Camera/camera.h"
-#include "../Loaders/Loaders.h"
-#include "../Math/Collisions.h"
-#include "../Meshes/Meshes.h"
-#include "../Scene/SceneManager.h"
-#include "../Shader/Shader.h"
+#include "Camera/camera.h"
+#include "Loaders/Loaders.h"
+#include "Math/Collisions.h"
+#include "Meshes/Meshes.h"
+#include "Scene/SceneManager.h"
+#include "Shader/Shader.h"
 
 struct Player {
     glm::vec3 position{0.0f};
-    glm::vec3 front{0.0f};
-    float speed{5.0f};
-    float jumpStrength{10.0f};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    float speed{25.0f};
     btRigidBody* body = nullptr;
 
-    void move(const glm::vec3& direction);
-    void jump();
+    void drive(float throttle, float steering, float deltaTime, const glm::vec3& groundNormal);
 };
 
 class Engine {
@@ -69,9 +67,11 @@ public:
                          const glm::quat& rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
                          const glm::vec3& scale = glm::vec3(1.0f));
     void addLight(const MeshData& markerMesh, const glm::vec3& position,
-                  const glm::vec3& color = glm::vec3(1.0f));
+                  const glm::vec3& color = glm::vec3(1.0f),
+                  bool castsShadows = true, bool persistent = false);
     void addLight(const char* modelPath, const glm::vec3& position,
-                  const glm::vec3& color = glm::vec3(1.0f));
+                  const glm::vec3& color = glm::vec3(1.0f),
+                  bool castsShadows = true, bool persistent = false);
     void clearDynamicObjects();
     void clearLights();
     glm::vec3 getCameraPosition() const;
@@ -81,6 +81,7 @@ public:
 private:
     static constexpr unsigned int SHADOW_MAP_SIZE = 1024;
     static constexpr float SHADOW_FAR_PLANE = 200.0f;
+    static constexpr float CAMERA_FAR_PLANE = 10000.0f;
 
     bool initialized = false;
     bool shadowMapReady = false;
@@ -98,7 +99,7 @@ private:
     std::vector<LightingObject> lights;
     Player player;
     SceneObject playerObject;
-    bool playerJumpWasDown = false;
+    std::vector<SceneObject> playerCarObjects;
 
     bool initializeShadowMap();
     GLuint createShadowCubemap();
