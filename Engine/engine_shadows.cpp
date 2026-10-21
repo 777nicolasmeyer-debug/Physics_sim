@@ -94,8 +94,8 @@ void Engine::renderShadowMap(const GLuint shadowCubemap, const glm::vec3& lightP
         shadowShader.loadMatrix("model", makeModelMatrix(object));
         object.buffers.draw();
     }
-    if (playerExists) {
-        for (const auto& carObject : playerCarObjects) {
+    if (car.isActive()) {
+        for (const auto& carObject : car.getRenderObjects()) {
             shadowShader.loadMatrix("model", makeModelMatrix(carObject));
             carObject.buffers.draw();
         }

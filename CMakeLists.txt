@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Physics_sim)
+project(RacecaR)
 
 set(CMAKE_CXX_STANDARD 23)
 
@@ -7,14 +7,16 @@ find_package(glad CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(Bullet CONFIG REQUIRED)
+find_package(SFML COMPONENTS Audio CONFIG REQUIRED)
 
 find_path(TINYGLTF_INCLUDE_DIR tiny_gltf.h
         PATHS ${VCPKG_ROOT}/installed/x64-mingw-dynamic/include
 )
 
-add_executable(Physics_sim
+add_executable(RacecaR
         src/main.cpp
         Engine/loaders_implementation.cpp
+        Engine/Car/Car.cpp
         Engine/engine.cpp
         Engine/engine_assets.cpp
         Engine/engine_player.cpp
@@ -30,15 +32,16 @@ add_executable(Physics_sim
         Engine/Scene/SceneManager.cpp
 )
 
-target_link_libraries(Physics_sim PRIVATE
+target_link_libraries(RacecaR PRIVATE
         glfw
+        SFML::Audio
         glad::glad
         BulletDynamics
         BulletCollision
         LinearMath
 )
 
-target_include_directories(Physics_sim PRIVATE
+target_include_directories(RacecaR PRIVATE
     ${Stb_INCLUDE_DIR}
         ${TINYGLTF_INCLUDE_DIR}
         Engine

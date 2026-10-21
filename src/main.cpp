@@ -1,40 +1,39 @@
 #include "../Engine/Engine.h"
 
+#include <cstdio>
 #include <iostream>
 
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
-#include <glm/gtc/quaternion.hpp>
 
 namespace {
-
-struct ApplicationState {
-    Engine* engine = nullptr;
-    bool spawnLightWasDown = false;
-    bool spawnObjectWasDown = false;
-    bool spawnCarWasDown = false;
-    bool resetWasDown = false;
-    bool playerWasDown = false;
-};
-
-void mouseCallback(GLFWwindow* window, const double xpos, const double ypos) {
-    auto* state = static_cast<ApplicationState*>(glfwGetWindowUserPointer(window));
-    if (state != nullptr && state->engine != nullptr) {
-        state->engine->handleMouseInput(xpos, ypos);
-    }
-}
-
-Engine::CameraInput readCameraInput(GLFWwindow* window) {
-    return {
-        glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS,
-        glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS,
-        glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS,
-        glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS,
-        glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS,
-        glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS
+    struct ApplicationState {
+        Engine *engine = nullptr;
+        bool spawnLightWasDown = false;
+        bool resetWasDown = false;
+        bool playerWasDown = false;
     };
-}
 
+    void mouseCallback(GLFWwindow *window, const double xpos, const double ypos) {
+        auto *state = static_cast<ApplicationState *>(glfwGetWindowUserPointer(window));
+        if (state != nullptr && state->engine != nullptr) {
+            state->engine->handleMouseInput(xpos, ypos);
+        }
+    }
+
+    Engine::CameraInput readCameraInput(GLFWwindow *window) {
+        Engine::CameraInput input;
+        input.forward = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
+        input.backward = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
+        input.left = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
+        input.right = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
+        input.up = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+        input.down = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+        input.brake = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+        input.shiftUp = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
+        input.shiftDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
+        return input;
+    }
 }
 
 int main() {
@@ -47,7 +46,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Physics sim", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(800, 600, "RacecaR", nullptr, nullptr);
     if (window == nullptr) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -72,12 +71,9 @@ int main() {
 
         if (!engine.initialize()) {
             result = 1;
-        }
-        else {
-            engine.addStaticModel("../assets/F1_track2.glb", glm::vec3(0.0f));
-            engine.addLight("../assets/Light.glb", glm::vec3(900.0f, 1500.0f, 650.0f),
-                            glm::vec3(1.0f), false, true);
-
+        } else {
+            engine.addStaticModel("../assets/F1_track2.glb", "../assets/track2_collision.glb", glm::vec3(0.0f));
+            engine.addLight("../assets/Light.glb", glm::vec3(900.0f, 1500.0f, 650.0f), glm::vec3(1.0f), false, true);
             glClearColor(0.4f, 0.6f, 0.8f, 1.0f);
             float lastFrame = static_cast<float>(glfwGetTime());
             while (!glfwWindowShouldClose(window)) {
@@ -99,21 +95,6 @@ int main() {
                 }
                 app.spawnLightWasDown = lightDown;
 
-                const bool objectDown = glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS;
-                if (objectDown && !app.spawnObjectWasDown) {
-                    engine.addDynamicModel("../assets/Object1.glb", engine.getCameraPosition());
-                }
-                app.spawnObjectWasDown = objectDown;
-
-                const bool carDown = glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS;
-                if (carDown && !app.spawnCarWasDown) {
-                    const glm::vec3 carPosition =
-                        engine.getCameraPosition() + engine.getCameraForward() * 5.0f +
-                        glm::vec3(0.0f, 2.0f, 0.0f);
-                    engine.addDynamicModel("../assets/F1.glb", carPosition);
-                }
-                app.spawnCarWasDown = carDown;
-
                 const bool resetDown = glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS;
                 if (resetDown && !app.resetWasDown) {
                     engine.clearDynamicObjects();
@@ -126,6 +107,14 @@ int main() {
                 }
 
                 engine.update(deltaTime);
+                if (engine.hasPlayer()) {
+                    char title[80];
+                    std::snprintf(title, sizeof(title), "Physics sim | Gear %d | %.0f RPM",
+                                  engine.getPlayerGear(), engine.getPlayerRPM());
+                    glfwSetWindowTitle(window, title);
+                } else {
+                    glfwSetWindowTitle(window, "Physics sim");
+                }
                 int width = 0;
                 int height = 0;
                 glfwGetFramebufferSize(window, &width, &height);

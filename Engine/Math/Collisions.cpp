@@ -112,32 +112,6 @@ void Collisions::removeRigidBody(btRigidBody* body) {
     delete body;
 }
 
-bool Collisions::isGrounded(const btRigidBody* body) const {
-    if (dynamicsWorld == nullptr || body == nullptr) {
-        return false;
-    }
-
-    const int manifoldCount = dynamicsWorld->getDispatcher()->getNumManifolds();
-    for (int i = 0; i < manifoldCount; ++i) {
-        const btPersistentManifold* manifold = dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
-        const bool isBody0 = manifold->getBody0() == body;
-        if (!isBody0 && manifold->getBody1() != body) {
-            continue;
-        }
-
-        for (int j = 0; j < manifold->getNumContacts(); ++j) {
-            const btManifoldPoint& contact = manifold->getContactPoint(j);
-            const btScalar normalY = isBody0
-                ? contact.m_normalWorldOnB.y()
-                : -contact.m_normalWorldOnB.y();
-            if (contact.getDistance() <= btScalar(0.05) && normalY > btScalar(0.5)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 glm::vec3 Collisions::getGroundNormal(const btRigidBody* body) const {
     if (dynamicsWorld == nullptr || body == nullptr) {
         return glm::vec3(0.0f);
@@ -230,7 +204,7 @@ btRigidBody* Collisions::convexShapeD(SceneObject& sceneObj, const MeshData& mes
     btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, hull, inertia);
     sceneObj.body = new btRigidBody(rbInfo);
     sceneObj.body->setFriction(0.8f);
-    sceneObj.body->setRestitution(1.0f);
+    sceneObj.body->setRestitution(0.0f);
     sceneObj.body->setAngularFactor(btVector3(1,1,1));
     dynamicsWorld->addRigidBody(sceneObj.body);
     if (mesh.vertices.size() % 8 != 0) {

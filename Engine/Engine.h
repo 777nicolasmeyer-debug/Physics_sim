@@ -9,21 +9,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include "Car/Car.h"
 #include "Camera/camera.h"
 #include "Loaders/Loaders.h"
 #include "Math/Collisions.h"
 #include "Meshes/Meshes.h"
 #include "Scene/SceneManager.h"
 #include "Shader/Shader.h"
-
-struct Player {
-    glm::vec3 position{0.0f};
-    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    float speed{25.0f};
-    btRigidBody* body = nullptr;
-
-    void drive(float throttle, float steering, float deltaTime, const glm::vec3& groundNormal);
-};
 
 class Engine {
 public:
@@ -34,6 +26,9 @@ public:
         bool right = false;
         bool up = false;
         bool down = false;
+        bool shiftUp = false;
+        bool shiftDown = false;
+        bool brake = false;
     };
 
     Engine() = default;
@@ -57,6 +52,10 @@ public:
     void addStaticModel(const char* path, const glm::vec3& position,
                         const glm::quat& rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
                         const glm::vec3& scale = glm::vec3(1.0f));
+    void addStaticModel(const char* renderPath, const char* collisionPath,
+                        const glm::vec3& position,
+                        const glm::quat& rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+                        const glm::vec3& scale = glm::vec3(1.0f));
     void addDynamicObject(const MeshData& mesh, const glm::vec3& position,
                           const glm::quat& rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
                           const glm::vec3& scale = glm::vec3(1.0f));
@@ -75,8 +74,9 @@ public:
     void clearDynamicObjects();
     void clearLights();
     glm::vec3 getCameraPosition() const;
-    glm::vec3 getCameraForward() const;
-    bool playerExists = false;
+    float getPlayerRPM() const;
+    int getPlayerGear() const;
+    bool hasPlayer() const;
 
 private:
     static constexpr unsigned int SHADOW_MAP_SIZE = 1024;
@@ -85,6 +85,8 @@ private:
 
     bool initialized = false;
     bool shadowMapReady = false;
+    bool shiftUpWasPressed = false;
+    bool shiftDownWasPressed = false;
     float cameraSpeed = 5.0f;
     GLuint shadowFramebuffer = 0;
 
@@ -97,9 +99,7 @@ private:
     std::vector<SceneObject> sceneObjects;
     std::vector<SceneObject> terrainObjects;
     std::vector<LightingObject> lights;
-    Player player;
-    SceneObject playerObject;
-    std::vector<SceneObject> playerCarObjects;
+    Car car;
 
     bool initializeShadowMap();
     GLuint createShadowCubemap();

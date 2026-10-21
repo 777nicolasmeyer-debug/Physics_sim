@@ -4,27 +4,36 @@
 
 #ifndef PHYSICS_SIM_LOADERS_H
 #define PHYSICS_SIM_LOADERS_H
-#include "stb_image.h"
 #include <glad/glad.h>
 #include "../Meshes/Meshes.h"
 #include <tiny_gltf.h>
+#include <SFML/Audio.hpp>
 
 class Loaders {
 public:
-    Loaders();
     void initialize();
-    unsigned int loadImageFromFile(const char* path);
-    unsigned int texture;
 
-    void loadModelFromFile(const char* path, tinygltf::Model& model);
-    GLuint createTextureFromImage(const tinygltf::Image& image);
-    bool PrimitiveCount = false;
+    bool loadModelFromFile(const char *path, tinygltf::Model &model);
 
-    MeshData extractMeshData(const tinygltf::Model& model, int meshIndex);
+    GLuint createTextureFromImage(const tinygltf::Image &image);
+
+    MeshData extractMeshData(const tinygltf::Model &model, int meshIndex);
+
 private:
-    unsigned char* data;
     GLuint createWhiteTexture();
+
     GLuint whiteTexture = 0;
+};
+
+class Sound {
+public:
+    sf::SoundBuffer buffer;
+    sf::Sound sound;
+};
+
+class Music {
+public:
+    sf::Music music;
 };
 
 #endif //PHYSICS_SIM_LOADERS_H

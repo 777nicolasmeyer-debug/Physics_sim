@@ -17,3 +17,13 @@ so it can use GLFW, Qt, or an ImGui host:
 `src/main.cpp` is the GLFW example host and contains the sample game's asset setup
 and spawn-key bindings. A Qt host can use the same engine calls from its
 `QOpenGLWidget` lifecycle without adopting the sample application's GLFW loop.
+
+The sample F1 car uses W to accelerate, S or Space to brake, A/D to steer,
+E to shift up, and Q to shift down. Its manual eight-speed gearbox shifts once per key press,
+and the window title displays the current gear and RPM. The car coasts with
+gradual drag instead of rapidly losing speed when throttle is released.
+`Engine::getPlayerRPM()` and `Engine::getPlayerGear()` are available to a host
+that wants to draw its own dashboard. Gear speed limits, acceleration rates,
+gear RPM multipliers, coast drag, tire grip, yaw rate, downforce, and brake force
+are tuned in `Engine/Car/CarConfig.h`. The RPM display follows vehicle speed but does not
+control vehicle speed or acceleration.

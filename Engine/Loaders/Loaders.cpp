@@ -1,279 +1,363 @@
-//
-// Created by 777ni on 2026/09/11.
-//
 #include "Loaders.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
-#include <limits>
-#include <stb_image.h>
-#include <tiny_gltf.h>
-#include "../Meshes/Meshes.h"
+#include <string>
 
-// Load a texture from file using stb_image
-unsigned int Loaders::loadImageFromFile(const char* path) {
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
+namespace {
+    GLenum getImageFormat(const int components) {
+        switch (components) {
+            case 1: return GL_RED;
+            case 2: return GL_RG;
+            case 3: return GL_RGB;
+            case 4: return GL_RGBA;
+            default: return 0;
+        }
+    }
 
-    int width, height, nrChannels;
-    unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);
-    if (data) {
-        GLenum format = GL_RGB;
-        if (nrChannels == 1) format = GL_RED;
-        else if (nrChannels == 3) format = GL_RGB;
-        else if (nrChannels == 4) format = GL_RGBA;
-
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0,
-                     format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
+    void setTextureParameters() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        stbi_image_free(data);
-    } else {
-        std::cerr << "Failed to load texture: " << path << std::endl;
-        stbi_image_free(data);
     }
-    return textureID;
+
+    const unsigned char *getElementData(const tinygltf::Model &model,
+                                        const tinygltf::Accessor &accessor,
+                                        const size_t index) {
+        if (index >= accessor.count || accessor.bufferView < 0 ||
+            static_cast<size_t>(accessor.bufferView) >= model.bufferViews.size()) {
+            return nullptr;
+        }
+
+        const auto &view = model.bufferViews[accessor.bufferView];
+        if (view.buffer < 0 || static_cast<size_t>(view.buffer) >= model.buffers.size()) {
+            return nullptr;
+        }
+
+        const int stride = accessor.ByteStride(view);
+        if (stride < 0) {
+            return nullptr;
+        }
+        const int componentSize = tinygltf::GetComponentSizeInBytes(accessor.componentType);
+        const int componentCount = tinygltf::GetNumComponentsInType(accessor.type);
+        if (componentSize <= 0 || componentCount <= 0 ||
+            stride < componentSize * componentCount) {
+            return nullptr;
+        }
+        const auto &buffer = model.buffers[view.buffer].data;
+        const size_t offset = view.byteOffset + accessor.byteOffset + index * static_cast<size_t>(stride);
+        const size_t elementSize = static_cast<size_t>(componentSize * componentCount);
+        const size_t viewEnd = view.byteOffset + view.byteLength;
+        if (offset > buffer.size() || elementSize > buffer.size() - offset ||
+            offset > viewEnd || elementSize > viewEnd - offset) {
+            return nullptr;
+        }
+        return buffer.data() + offset;
+    }
+
+    float readAttributeComponent(const unsigned char *data, const int componentType,
+                                 const bool normalized) {
+        switch (componentType) {
+            case TINYGLTF_COMPONENT_TYPE_FLOAT: {
+                float value;
+                std::memcpy(&value, data, sizeof(value));
+                return value;
+            }
+            case TINYGLTF_COMPONENT_TYPE_BYTE: {
+                int8_t value;
+                std::memcpy(&value, data, sizeof(value));
+                return normalized
+                           ? std::max(static_cast<float>(value) / 127.0f, -1.0f)
+                           : static_cast<float>(value);
+            }
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+                uint8_t value;
+                std::memcpy(&value, data, sizeof(value));
+                return normalized
+                           ? static_cast<float>(value) / 255.0f
+                           : static_cast<float>(value);
+            }
+            case TINYGLTF_COMPONENT_TYPE_SHORT: {
+                int16_t value;
+                std::memcpy(&value, data, sizeof(value));
+                return normalized
+                           ? std::max(static_cast<float>(value) / 32767.0f, -1.0f)
+                           : static_cast<float>(value);
+            }
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+                uint16_t value;
+                std::memcpy(&value, data, sizeof(value));
+                return normalized
+                           ? static_cast<float>(value) / 65535.0f
+                           : static_cast<float>(value);
+            }
+            default:
+                return 0.0f;
+        }
+    }
+
+    bool isSupportedAttributeComponent(const int componentType) {
+        return componentType == TINYGLTF_COMPONENT_TYPE_FLOAT ||
+               componentType == TINYGLTF_COMPONENT_TYPE_BYTE ||
+               componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ||
+               componentType == TINYGLTF_COMPONENT_TYPE_SHORT ||
+               componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+    }
+
+    bool readIndex(const unsigned char *data, const int componentType, unsigned int &index) {
+        switch (componentType) {
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+                uint8_t value;
+                std::memcpy(&value, data, sizeof(value));
+                index = value;
+                return true;
+            }
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+                uint16_t value;
+                std::memcpy(&value, data, sizeof(value));
+                index = value;
+                return true;
+            }
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                std::memcpy(&index, data, sizeof(index));
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    const tinygltf::Accessor *findAccessor(const tinygltf::Model &model,
+                                           const tinygltf::Primitive &primitive,
+                                           const std::string &attribute) {
+        const auto found = primitive.attributes.find(attribute);
+        if (found == primitive.attributes.end() || found->second < 0 ||
+            static_cast<size_t>(found->second) >= model.accessors.size()) {
+            return nullptr;
+        }
+        return &model.accessors[found->second];
+    }
 }
-
-void Loaders::loadModelFromFile(const char* path, tinygltf::Model& model) {
-    tinygltf::TinyGLTF loader;
-    std::string err;
-    std::string warn;
-
-    bool ret = false;
-
-    // Decide whether to load binary (.glb) or ASCII (.gltf)
-    std::string filePath(path);
-    if (filePath.size() >= 5 && filePath.substr(filePath.size() - 5) == ".gltf") {
-        ret = loader.LoadASCIIFromFile(&model, &err, &warn, path);
-    } else {
-        ret = loader.LoadBinaryFromFile(&model, &err, &warn, path);
-    }
-
-    if (!warn.empty()) {
-        std::cout << "TinyGLTF warning: " << warn << std::endl;
-    }
-    if (!err.empty()) {
-        std::cerr << "TinyGLTF error: " << err << std::endl;
-    }
-
-    if (!ret) {
-        std::cerr << "Failed to load model: " << path << std::endl;
-    }
-
-    std::cout << "Successfully loaded model: " << path << std::endl;
-}
-
-GLuint Loaders::createTextureFromImage(const tinygltf::Image& image) {
-    GLuint tex;
-
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-
-    GLenum format = image.component == 4 ? GL_RGBA : GL_RGB;
-
-    glTexImage2D(GL_TEXTURE_2D, 0, format, image.width, image.height, 0, format, GL_UNSIGNED_BYTE, image.image.data());
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    return tex;
-}
-
-GLuint Loaders::createWhiteTexture()
-{
-    GLuint tex = 0;
-
-    unsigned char whitePixel[] = {
-        255, 255, 255, 255
-    };
-
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,1,1,0,GL_RGBA,GL_UNSIGNED_BYTE,whitePixel);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-
-    return tex;
-}
-
-Loaders::Loaders() = default;
 
 void Loaders::initialize() {
-    whiteTexture = createWhiteTexture();
+    if (whiteTexture == 0) {
+        whiteTexture = createWhiteTexture();
+    }
 }
 
-// Load a glTF model from file
-// Extract mesh data (positions + normals + UVs + indices)
-MeshData Loaders::extractMeshData(const tinygltf::Model& model, int meshIndex) {
-    MeshData data;
-    const tinygltf::Mesh& mesh = model.meshes[meshIndex];
+bool Loaders::loadModelFromFile(const char *path, tinygltf::Model &model) {
+    tinygltf::TinyGLTF loader;
+    std::string error;
+    std::string warning;
+    const std::string filePath(path);
+    const bool isGltf = filePath.size() >= 5 &&
+                        filePath.substr(filePath.size() - 5) == ".gltf";
+    const bool loaded = isGltf
+                            ? loader.LoadASCIIFromFile(&model, &error, &warning, path)
+                            : loader.LoadBinaryFromFile(&model, &error, &warning, path);
 
-    for (const auto& primitive : mesh.primitives) {
-        const unsigned int baseVertex = static_cast<unsigned int>(data.vertices.size() / 8);
-        if (primitive.material >= 0) {
-            const auto& material = model.materials[primitive.material];
-            const auto& color = material.pbrMetallicRoughness.baseColorFactor;
-            data.baseColor = glm::vec4(static_cast<float>(color[0]), static_cast<float>(color[1]),
-                                       static_cast<float>(color[2]), static_cast<float>(color[3]));
+    if (!warning.empty()) {
+        std::cerr << "TinyGLTF warning: " << warning << std::endl;
+    }
+    if (!error.empty()) {
+        std::cerr << "TinyGLTF error: " << error << std::endl;
+    }
+    if (!loaded) {
+        std::cerr << "Failed to load model: " << path << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+GLuint Loaders::createTextureFromImage(const tinygltf::Image &image) {
+    const GLenum format = getImageFormat(image.component);
+    if (format == 0 || image.width <= 0 || image.height <= 0 || image.image.empty()) {
+        std::cerr << "Cannot create texture from an invalid glTF image" << std::endl;
+        return 0;
+    }
+
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    GLint previousAlignment = 4;
+    glGetIntegerv(GL_UNPACK_ALIGNMENT, &previousAlignment);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(format), image.width, image.height, 0,
+                 format, GL_UNSIGNED_BYTE, image.image.data());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, previousAlignment);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    setTextureParameters();
+    return texture;
+}
+
+GLuint Loaders::createWhiteTexture() {
+    constexpr unsigned char whitePixel[]{255, 255, 255, 255};
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, whitePixel);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    return texture;
+}
+
+MeshData Loaders::extractMeshData(const tinygltf::Model &model, const int meshIndex) {
+    MeshData data;
+    if (meshIndex < 0 || static_cast<size_t>(meshIndex) >= model.meshes.size()) {
+        std::cerr << "Invalid glTF mesh index: " << meshIndex << std::endl;
+        return data;
+    }
+
+    const auto &mesh = model.meshes[meshIndex];
+    for (const auto &primitive: mesh.primitives) {
+        if (primitive.mode != -1 && primitive.mode != TINYGLTF_MODE_TRIANGLES) {
+            std::cerr << "Skipping non-triangle glTF primitive in mesh " << meshIndex << std::endl;
+            continue;
+        }
+        const tinygltf::Accessor *positions = findAccessor(model, primitive, "POSITION");
+        if (positions == nullptr || positions->type != TINYGLTF_TYPE_VEC3) {
+            std::cerr << "Skipping glTF primitive without valid POSITION data" << std::endl;
+            continue;
+        }
+
+        const tinygltf::Accessor *normals = findAccessor(model, primitive, "NORMAL");
+        const tinygltf::Accessor *uvs = findAccessor(model, primitive, "TEXCOORD_0");
+        const size_t baseVertexCount = data.vertices.size() / 8;
+        const size_t baseIndexCount = data.indices.size();
+        std::vector<unsigned int> indices;
+        if (primitive.indices < 0) {
+            indices.resize(positions->count);
+            for (size_t i = 0; i < indices.size(); ++i) {
+                indices[i] = static_cast<unsigned int>(i);
+            }
+        } else if (static_cast<size_t>(primitive.indices) < model.accessors.size()) {
+            const auto &indexAccessor = model.accessors[primitive.indices];
+            if (indexAccessor.type != TINYGLTF_TYPE_SCALAR) {
+                std::cerr << "Skipping glTF primitive with non-scalar indices" << std::endl;
+                continue;
+            }
+            indices.reserve(indexAccessor.count);
+            bool validIndices = true;
+            for (size_t i = 0; i < indexAccessor.count; ++i) {
+                const unsigned char *element = getElementData(model, indexAccessor, i);
+                unsigned int index = 0;
+                if (element == nullptr ||
+                    !readIndex(element, indexAccessor.componentType, index)) {
+                    validIndices = false;
+                    break;
+                }
+                indices.push_back(index);
+            }
+            if (!validIndices) {
+                std::cerr << "Skipping glTF primitive with invalid indices" << std::endl;
+                continue;
+            }
+        } else {
+            std::cerr << "Skipping glTF primitive with invalid index accessor" << std::endl;
+            continue;
+        }
+        if (indices.size() % 3 != 0) {
+            std::cerr << "Skipping glTF primitive with an incomplete triangle" << std::endl;
+            continue;
+        }
+
+        const int positionComponentSize =
+                tinygltf::GetComponentSizeInBytes(positions->componentType);
+        const int positionComponentCount = tinygltf::GetNumComponentsInType(positions->type);
+        const int normalComponentSize = normals == nullptr
+                                            ? 0
+                                            : tinygltf::GetComponentSizeInBytes(normals->componentType);
+        const int uvComponentSize =
+                uvs == nullptr ? 0 : tinygltf::GetComponentSizeInBytes(uvs->componentType);
+        if (positionComponentSize <= 0 || positionComponentCount != 3 ||
+            !isSupportedAttributeComponent(positions->componentType) ||
+            (normals != nullptr && normals->type != TINYGLTF_TYPE_VEC3) ||
+            (normals != nullptr &&
+             (!isSupportedAttributeComponent(normals->componentType) || normalComponentSize <= 0)) ||
+            (uvs != nullptr &&
+             (uvs->type != TINYGLTF_TYPE_VEC2 ||
+              !isSupportedAttributeComponent(uvs->componentType) || uvComponentSize <= 0))) {
+            std::cerr << "Skipping glTF primitive with unsupported vertex attributes" << std::endl;
+            continue;
+        }
+
+        const auto &materialIndex = primitive.material;
+        if (materialIndex >= 0 && static_cast<size_t>(materialIndex) < model.materials.size()) {
+            const auto &material = model.materials[materialIndex];
+            const auto &color = material.pbrMetallicRoughness.baseColorFactor;
+            data.baseColor = glm::vec4(static_cast<float>(color[0]),
+                                       static_cast<float>(color[1]),
+                                       static_cast<float>(color[2]),
+                                       static_cast<float>(color[3]));
             data.transparent = material.alphaMode == "BLEND";
             data.alphaMasked = material.alphaMode == "MASK";
             data.alphaCutoff = static_cast<float>(material.alphaCutoff);
 
-            int colorTex = material.pbrMetallicRoughness.baseColorTexture.index;
-
-            if (colorTex >= 0) {
-                const auto& texture = model.textures[colorTex];
-                const auto& image = model.images[texture.source];
-                data.textureID = createTextureFromImage(image);
+            const int textureIndex = material.pbrMetallicRoughness.baseColorTexture.index;
+            if (textureIndex >= 0 && static_cast<size_t>(textureIndex) < model.textures.size()) {
+                const int imageIndex = model.textures[textureIndex].source;
+                if (imageIndex >= 0 && static_cast<size_t>(imageIndex) < model.images.size()) {
+                    data.textureID = createTextureFromImage(model.images[imageIndex]);
+                }
             }
-            else {
+            if (data.textureID == 0) {
                 data.textureID = whiteTexture;
             }
-        }
-        // POSITION
-        const tinygltf::Accessor& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
-        const tinygltf::BufferView& posView = model.bufferViews[posAccessor.bufferView];
-        const tinygltf::Buffer& posBuffer = model.buffers[posView.buffer];
-        const float* positions = reinterpret_cast<const float*>(
-            &posBuffer.data[posView.byteOffset + posAccessor.byteOffset]);
-
-        // NORMAL
-        const float* normals = nullptr;
-        if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
-            const tinygltf::Accessor& normAccessor = model.accessors[primitive.attributes.at("NORMAL")];
-            const tinygltf::BufferView& normView = model.bufferViews[normAccessor.bufferView];
-            const tinygltf::Buffer& normBuffer = model.buffers[normView.buffer];
-            normals = reinterpret_cast<const float*>(
-                &normBuffer.data[normView.byteOffset + normAccessor.byteOffset]);
+        } else {
+            data.textureID = whiteTexture;
         }
 
-        // TEXCOORD_0
-        const float* uvs = nullptr;
-        if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end()) {
-            const tinygltf::Accessor& uvAccessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
-            const tinygltf::BufferView& uvView = model.bufferViews[uvAccessor.bufferView];
-            const tinygltf::Buffer& uvBuffer = model.buffers[uvView.buffer];
-            uvs = reinterpret_cast<const float*>(
-                &uvBuffer.data[uvView.byteOffset + uvAccessor.byteOffset]);
-        }
-        const tinygltf::Accessor* normAccessor = nullptr;
-        if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
-            normAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
-        }
-        const tinygltf::Accessor* uvAccessor = nullptr;
-        if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end()) {
-            uvAccessor = &model.accessors[primitive.attributes.at("TEXCOORD_0")];
-        }
-
-
-        // INDICES
-        const tinygltf::Accessor& idxAccessor = model.accessors[primitive.indices];
-        const tinygltf::BufferView& idxView = model.bufferViews[idxAccessor.bufferView];
-        const tinygltf::Buffer& idxBuffer = model.buffers[idxView.buffer];
-        const unsigned char* base = &idxBuffer.data[idxView.byteOffset + idxAccessor.byteOffset];
-
-
-        // Parse indices according to type
-        std::vector<unsigned int> indices;
-        if (idxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-            const unsigned short* idx = reinterpret_cast<const unsigned short*>(base);
-            indices.assign(idx, idx + idxAccessor.count);
-        } else if (idxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-            const unsigned int* idx = reinterpret_cast<const unsigned int*>(base);
-            indices.assign(idx, idx + idxAccessor.count);
-        } else if (idxAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
-            const unsigned char* idx = reinterpret_cast<const unsigned char*>(base);
-            indices.assign(idx, idx + idxAccessor.count);
-        }
-
-        // Build vertex buffer per index
-        for (size_t i = 0; i < indices.size(); ++i) {
-            unsigned int idx = indices[i];
-            if (idx >= posAccessor.count) {
-                std::cerr << "Index " << idx << " out of range for positions (count=" << posAccessor.count << ")" << std::endl;
-                continue;
+        bool validPrimitive = true;
+        for (const unsigned int index: indices) {
+            if (index >= positions->count) {
+                validPrimitive = false;
+                break;
+            }
+            const unsigned char *positionData = getElementData(model, *positions, index);
+            const unsigned char *normalData =
+                    normals != nullptr && index < normals->count
+                        ? getElementData(model, *normals, index)
+                        : nullptr;
+            const unsigned char *uvData =
+                    uvs != nullptr && index < uvs->count ? getElementData(model, *uvs, index) : nullptr;
+            if (positionData == nullptr) {
+                validPrimitive = false;
+                break;
             }
 
-
-            // Position
-            data.vertices.push_back(positions[idx * 3 + 0]);
-            data.vertices.push_back(positions[idx * 3 + 1]);
-            data.vertices.push_back(positions[idx * 3 + 2]);
-
-            // Normal
-            if (normals && normAccessor && idx < normAccessor->count) {
-                data.vertices.push_back(normals[idx * 3 + 0]);
-                data.vertices.push_back(normals[idx * 3 + 1]);
-                data.vertices.push_back(normals[idx * 3 + 2]);
+            for (int component = 0; component < 3; ++component) {
+                data.vertices.push_back(readAttributeComponent(
+                    positionData + component * positionComponentSize,
+                    positions->componentType, positions->normalized));
             }
-            else {
-                data.vertices.insert(
-                    data.vertices.end(),
-                    {0.0f,0.0f,0.0f}
-                );
+            for (int component = 0; component < 3; ++component) {
+                data.vertices.push_back(
+                    normalData == nullptr
+                        ? 0.0f
+                        : readAttributeComponent(normalData + component * normalComponentSize,
+                                                 normals->componentType, normals->normalized));
             }
-          /*  if (normals && idx < normAccessor->count) {
-                // safe to read normal
-            } else {
-                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f, 0.0f});
-            } */
-
-            // UV
-            if (uvs && uvAccessor && idx < uvAccessor->count) {
-                data.vertices.push_back(uvs[idx * 2 + 0]);
-                data.vertices.push_back(uvs[idx * 2 + 1]);
+            for (int component = 0; component < 2; ++component) {
+                data.vertices.push_back(
+                    uvData == nullptr
+                        ? 0.0f
+                        : readAttributeComponent(uvData + component * uvComponentSize,
+                                                 uvs->componentType, uvs->normalized));
             }
-            else {
-                data.vertices.insert(
-                    data.vertices.end(),
-                    {0.0f,0.0f}
-                );
-            }
-
-
-            /*if (uvs && idx < uvAccessor->count) {
-                // safe to read uv
-            } else {
-                data.vertices.insert(data.vertices.end(), {0.0f, 0.0f});
-            } */
-
-
-            // Sequential index into new vertex array
-            data.indices.push_back(baseVertex + static_cast<unsigned int>(i));
+            data.indices.push_back(static_cast<unsigned int>(data.indices.size()));
         }
 
-        data.indexType = GL_UNSIGNED_INT; // we generate sequential unsigned int indices
-
-        std::cout << "Vertices: " << data.vertices.size() / 8   // pos(3)+norm(3)+uv(2) = 8 floats per vertex
-                  << " Indices: " << data.indices.size()
-                  << " Primitive indices accessor: " << primitive.indices << std::endl;
-        std::cout << "Images: " << model.images.size() << std::endl;
-        std::cout << "Textures: " << model.textures.size() << std::endl;
-        std::cout << "Materials: " << model.materials.size() << std::endl;
-        std::cout << "Mesh count: "<< model.meshes.size()<< std::endl;
-        std::cout << "Primitive count: "<< model.meshes[0].primitives.size()<< std::endl;
-        std::cout << "Primitive material: "<< primitive.material<< std::endl;
-
+        if (!validPrimitive) {
+            data.vertices.resize(baseVertexCount * 8);
+            data.indices.resize(baseIndexCount);
+            std::cerr << "Skipping glTF primitive with invalid vertex data" << std::endl;
+            continue;
+        }
     }
-
-    if (!data.vertices.empty()) {
-        glm::vec3 minimum(std::numeric_limits<float>::max());
-        glm::vec3 maximum(std::numeric_limits<float>::lowest());
-        for (size_t i = 0; i + 2 < data.vertices.size(); i += 8) {
-            const glm::vec3 point(data.vertices[i], data.vertices[i + 1], data.vertices[i + 2]);
-            minimum = glm::min(minimum, point);
-            maximum = glm::max(maximum, point);
-        }
-        data.localCenter = (minimum + maximum) * 0.5f;
-    }
+    data.indexType = GL_UNSIGNED_INT;
     return data;
 }

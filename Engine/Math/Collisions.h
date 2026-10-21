@@ -15,7 +15,6 @@ public:
     void init();
     void update(float dt);
     void removeRigidBody(btRigidBody* body);
-    bool isGrounded(const btRigidBody* body) const;
     glm::vec3 getGroundNormal(const btRigidBody* body) const;
     btRigidBody* convexShapeD(SceneObject& sceneObj, const MeshData& mesh,
                               const glm::vec3& scale = glm::vec3(1.0f));

@@ -1,6 +1,4 @@
 #include "Engine.h"
-#include "EngineConfig.h"
-
 #include <algorithm>
 #include <iostream>
 
@@ -8,11 +6,7 @@ Engine::~Engine() {
     if (!initialized) {
         return;
     }
-    if (playerExists) {
-        collisions.removeRigidBody(player.body);
-        player.body = nullptr;
-        playerExists = false;
-    }
+    car.despawn(collisions);
     clearDynamicObjects();
     for (const auto& light : lights) {
         if (light.shadowCubemap != 0) {
@@ -54,10 +48,7 @@ void Engine::update(float deltaTime) {
     }
     collisions.update(deltaTime);
     updatePhysicsTransforms();
-    if (playerExists) {
-        camera.setPosition(player.position - player.rotation * engine_config::chassisOffset +
-                           player.rotation * engine_config::cockpitOffset);
-    }
+    car.updateCamera(camera);
 }
 
 void Engine::render(const int width, const int height) {
@@ -96,8 +87,8 @@ void Engine::render(const int width, const int height) {
         };
         appendObjects(sceneObjects);
         appendObjects(terrainObjects);
-        for (auto& carObject : playerCarObjects) {
-            if (playerExists && carObject.transparent == transparent) {
+        for (auto& carObject : car.getRenderObjects()) {
+            if (car.isActive() && carObject.transparent == transparent) {
                 objects.push_back(&carObject);
             }
         }

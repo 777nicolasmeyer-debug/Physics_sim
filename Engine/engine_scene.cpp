@@ -4,8 +4,10 @@
 #include <limits>
 #include <unordered_set>
 
-void Engine::addStaticObject(const MeshData& mesh, const glm::vec3& position,
-                             const glm::quat& rotation, const glm::vec3& scale) {
+namespace {
+
+SceneObject createSceneObject(const MeshData& mesh, const glm::vec3& position,
+                              const glm::quat& rotation, const glm::vec3& scale) {
     SceneObject object;
     object.buffers.init(mesh);
     object.position = position;
@@ -17,14 +19,47 @@ void Engine::addStaticObject(const MeshData& mesh, const glm::vec3& position,
     object.transparent = mesh.transparent;
     object.alphaMasked = mesh.alphaMasked;
     object.alphaCutoff = mesh.alphaCutoff;
+    return object;
+}
+
+}
+
+void Engine::addStaticObject(const MeshData& mesh, const glm::vec3& position,
+                             const glm::quat& rotation, const glm::vec3& scale) {
+    SceneObject object = createSceneObject(mesh, position, rotation, scale);
     collisions.triangleShapeS(object, mesh);
     terrainObjects.push_back(object);
 }
 
-void Engine::addStaticModel(const char* path, const glm::vec3& position,
-                            const glm::quat& rotation, const glm::vec3& scale) {
-    for (const auto& mesh : loadModelMeshes(path)) {
-        addStaticObject(mesh, position, rotation, scale);
+void Engine::addStaticModel(const char* renderPath, const char* collisionPath,
+                            const glm::vec3& position, const glm::quat& rotation,
+                            const glm::vec3& scale) {
+                            for (const auto& mesh : loadModelMeshes(renderPath)) {
+                                terrainObjects.push_back(createSceneObject(mesh, position, rotation, scale));
+    }
+
+    size_t collisionMeshCount = 0;
+    for (const auto& sourceMesh : loadModelMeshes(collisionPath)) {
+        if (sourceMesh.vertices.empty() || sourceMesh.indices.size() < 3) {
+            continue;
+        }
+
+        MeshData collisionMesh = sourceMesh;
+        for (size_t i = 0; i + 2 < collisionMesh.vertices.size(); i += 8) {
+            collisionMesh.vertices[i] *= scale.x;
+            collisionMesh.vertices[i + 1] *= scale.y;
+            collisionMesh.vertices[i + 2] *= scale.z;
+        }
+
+        SceneObject collisionObject;
+        collisionObject.position = position;
+        collisionObject.rotation = rotation;
+        collisions.triangleShapeS(collisionObject, collisionMesh);
+        ++collisionMeshCount;
+    }
+    if (collisionMeshCount == 0) {
+        std::cerr << "Static collision model contains no triangle meshes: "
+                  << collisionPath << std::endl;
     }
 }
 
@@ -34,17 +69,7 @@ void Engine::addDynamicObject(const MeshData& mesh, const glm::vec3& position,
         return;
     }
 
-    SceneObject object;
-    object.buffers.init(mesh);
-    object.position = position;
-    object.rotation = rotation;
-    object.scale = scale;
-    object.textureID = mesh.textureID;
-    object.baseColor = mesh.baseColor;
-    object.localCenter = mesh.localCenter;
-    object.transparent = mesh.transparent;
-    object.alphaMasked = mesh.alphaMasked;
-    object.alphaCutoff = mesh.alphaCutoff;
+    SceneObject object = createSceneObject(mesh, position, rotation, scale);
     collisions.convexShapeD(object, mesh, scale);
     sceneObjects.push_back(object);
 }
@@ -104,17 +129,7 @@ void Engine::addDynamicModel(const std::vector<MeshData>& meshes, const glm::vec
             centeredMesh.vertices[i + 2] -= modelCenter.z;
         }
         centeredMesh.localCenter -= modelCenter;
-        SceneObject object;
-        object.buffers.init(centeredMesh);
-        object.position = position;
-        object.rotation = rotation;
-        object.scale = scale;
-        object.textureID = centeredMesh.textureID;
-        object.baseColor = centeredMesh.baseColor;
-        object.localCenter = centeredMesh.localCenter;
-        object.transparent = centeredMesh.transparent;
-        object.alphaMasked = centeredMesh.alphaMasked;
-        object.alphaCutoff = centeredMesh.alphaCutoff;
+        SceneObject object = createSceneObject(centeredMesh, position, rotation, scale);
         object.body = physicsObject.body;
         sceneObjects.push_back(object);
     }
@@ -192,8 +207,4 @@ void Engine::clearLights() {
 
 glm::vec3 Engine::getCameraPosition() const {
     return camera.getPosition();
-}
-
-glm::vec3 Engine::getCameraForward() const {
-    return camera.getFront();
 }
